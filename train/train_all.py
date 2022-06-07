@@ -28,7 +28,7 @@ if __name__ == '__main__':
             else:
                 pass
 
-            model_list = ['v_convlstm'] # the models to train
+            model_list = ['v_convlstm'] # the models to train ## change to ViT?
 
             for i in range(len(model_list)):
                 model_n = model_list[i]

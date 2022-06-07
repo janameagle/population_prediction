@@ -21,7 +21,7 @@ class MyDataset(Dataset):
         mask = np.load(self.msk_ids[index])
 
         if self.aug == True: # create random augmentation -> random subimage
-            img_size = img.shape[-1] # which dimension?
+            img_size = img.shape[-1] # width or height
             crop_size = 256
             w_random = np.random.randint(img_size - crop_size) # one random nr, why imgs-crops?
             h_random = np.random.randint(img_size - crop_size)
