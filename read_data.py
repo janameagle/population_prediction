@@ -68,8 +68,9 @@ dat_multitemp = np.array([a, b, c])
 
 
 # loop over years and stack all the data to retreive an array [20,7,888,888]:
-seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
-dat_multitemp = np.zeros((20,7,888,888))
+# seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
+seq = ['01', '02', '05', '10', '15', '20']
+dat_multitemp = np.zeros((6,7,888,888))
 i=0
 
 for y in seq:
@@ -79,19 +80,38 @@ for y in seq:
    i += 1
    
 
-print(dat_multitemp.shape)
+print(dat_multitemp.shape) # [:,x,:,:] = (pop, urb_dist_r, lc_r, slope_r, streets_dist_r, water_dist_r, center_dist_r)
 print(dat_multitemp)
-plt.imshow(dat_multitemp[10,2,:,:])
+plt.imshow(dat_multitemp[1,2,:,:]) 
 
+# put lc on first place in second axis, for lulc prediction model
+lc_multitemp = np.zeros((6,7,888,888))
+lc_multitemp[:,0,:,:] = dat_multitemp[:,2,:,:]
+lc_multitemp[:,1:3,:,:] = dat_multitemp[:,0:2,:,:]
+lc_multitemp[:,3:7,:,:] = dat_multitemp[:,3:7,:,:]
+print(lc_multitemp)
+print(lc_multitemp.shape) # (lc, pop, urb_dist, slope, streets_dist, water_dist, center_dist)
+plt.imshow(lc_multitemp[1,0,:,:]) 
+
+lcnew_multitemp = lc_multitemp
+lcnew_multitemp[lc_multitemp == 7] = 0
+lcnew_multitemp[lc_multitemp == 9] = 1
+lcnew_multitemp[lc_multitemp == 10] = 2
+lcnew_multitemp[lc_multitemp == 12] = 3
+lcnew_multitemp[lc_multitemp == 13] = 4
+lcnew_multitemp[lc_multitemp == 16] = 5
+lcnew_multitemp[lc_multitemp == 17] = 6
+np.unique(lcnew_multitemp[:, 0, :, :])
 
 # save stacked multitemporal image as numpy data
-np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/input_all.npy', dat_multitemp)
+np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c.npy', lc_multitemp)
 
 
 
 # slice the input data image
 
 full_image = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/input_all.npy')
+full_image = lcnew_multitemp
 h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]
 img_size = 256 # how big the tiles should be
@@ -116,13 +136,13 @@ for x, y in zip(new_x_list, new_y_list):
     sub_img = full_image[:, :, x - 128:x + 128, y - 128:y + 128] # get subimage around centroid
     sub_img_list.append(sub_img)    
     
-print(len(sub_img_list)) # why just 36? h_step and w_step too big? should be 200?
+print(len(sub_img_list))
 print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/input/'+ str(i) + '_input.npy', sub_img_list[1][:,1:7,:,:])
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
+    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c/input/'+ str(i) + '_input.npy', sub_img_list[1][:,:,:,:])
+    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
 
 
 

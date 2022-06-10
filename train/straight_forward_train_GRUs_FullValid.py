@@ -3,7 +3,7 @@
 # This is done to follow the data manipulation and thus understand what is done in detail
 
 
-from model.v_convgru import ConvGRU
+from Documents.Masterarbeit.Code.population_prediction.model.v_convlstm import ConvLSTM
 import os
 import torch
 import torch.nn as nn
@@ -13,9 +13,9 @@ import logging
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
 import pandas as pd
-from utilis.dataset import MyDataset
-from train.options import get_args
-from utilis.weight_init import weight_init
+from Documents.Masterarbeit.Code.population_prediction.utilis.dataset import MyDataset
+from Documents.Masterarbeit.Code.population_prediction.train.options import get_args
+from Documents.Masterarbeit.Code.population_prediction.utilis.weight_init import weight_init
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import numpy as np
@@ -24,40 +24,24 @@ import numpy as np
 
 
 # from train_all script
-from model.v_convlstm import ConvLSTM
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(device)
-    args = get_args()
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
+args = get_args()
 
-    pred_sequence_list = ['forecasting'] #'backcasting'                        # what is backcasting? why do it?
+pred_sequence_list = ['forecasting'] #'backcasting'                        # what is backcasting? why do it?
 
-    for pred_sequence in pred_sequence_list:
-        factor_list = ['with_factors']                                         # what factors?
+bias_status = True #False                                          # ?
+beta = 0                                                           # ?
 
-        for factor in factor_list:
-
-            bias_status = True #False                                          # ?
-            beta = 0                                                           # ?
-
-            if factor == 'with_factors':
-                input_channel = 19                                             # why 19?
-
-            else:
-                pass
-
-                
-                if seed is not None:
-                    torch.manual_seed(seed)                                    # should I set a seed for model improvement? 
-                else:
-                    seed = 'noSeed'
-                print('seed: ', seed)
+input_channel = 6                                            # why 19?
 
 
-                    net = ConvLSTM(input_dim=input_channel,
-                                   hidden_dim=[32, 16, args.n_features],
-                                   kernel_size=(3, 3), num_layers=args.n_layer,
-                                   batch_first=True, bias=bias_status, return_all_layers=False)
-                    net.to(device)
+
+net = ConvLSTM(input_dim=input_channel,
+               hidden_dim=[32, 16, args.n_features], # hidden_dim=[32, 16, args.n_features]
+               kernel_size=(3, 3), num_layers=args.n_layer,
+               batch_first=True, bias=bias_status, return_all_layers=False)
+net.to(device)
                     # train_ConvGRU_FullValid(net=net, device=torch.device('cuda'),
                     #               epochs=args.epoch, batch_size=args.batch_size, lr=args.learn_rate,
                     #               save_cp=True, save_csv=True, factor_option=factor,
@@ -76,46 +60,56 @@ from model.v_convlstm import ConvLSTM
 
     
 # specifications from function
-epochs = args.epoch
-batch-size = args.batch_size
+epochs = 1 #args.epoch
+batch_size = 1 # args.batch_size
 lr = args.learn_rate
 save_cp = True
 save_csv = True
-factor_option = factor
-pred_seq = pred_sequence
-model_n = str(seed) + '_' + model_n
+factor_option = 'with_factors'
+pred_seq = 'forward'
+model_n = 'No_seed_convLSTM'
     
 
-    args = get_args()
-    dataset_dir = "../data/train_valid/{}/{}/".format(pred_seq,'dataset_1')
-    train_dir = dataset_dir + "train/"
-    train_data = MyDataset(imgs_dir = train_dir + 'input/',masks_dir = train_dir +'target/')
-    train_loader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True, num_workers= 4)
+dataset_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
+train_dir = dataset_dir + "train/"
+pred = 'lulc_pred_6y/'
+train_data = MyDataset(imgs_dir = train_dir + pred + 'input/',masks_dir = train_dir + pred +'target/')
+train_loader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True, num_workers= 1)
 
-    ori_data_dir = '../data/ori_data/211002_lulcmaps.npy'
+ori_data_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y.npy'
 
 
 
     # valid_input, gt = get_valid_dataset(ori_data_dir)
-        ori_data = np.load(ori_data_dir).transpose((1, 0, 2, 3))
-        scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
+ori_data = np.load(ori_data_dir)#.transpose((1, 0, 2, 3)) #(c, t, w, h) -> (t, c, w, h)
+scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
                                                       scale_factor=(1 / 3, 1 / 3),
                                                       recompute_scale_factor=True)
-        processed_ori_data = scaled_data.numpy()
-        valid_input = processed_ori_data[1:5, :, :, :]
-        gt = processed_ori_data[-1, 0, :, :]
+processed_ori_data = scaled_data.numpy()
+valid_input = processed_ori_data[1:5, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
 
 
+# change class values to 0-4
+# valid_input[valid_input == 7] = 0
+# valid_input[valid_input == 9] = 1
+# valid_input[valid_input == 10] = 2
+# valid_input[valid_input == 13] = 3
+# valid_input[valid_input == 16] = 4
+# valid_input[valid_input == 17] = 5
+ 
+ 
+ 
+gt = processed_ori_data[-1, 0, :, :] # last year, land cover
 
-    optimizer = optim.Adam(net.parameters(), lr, (0.9, 0.999))
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True)
-    criterion = nn.CrossEntropyLoss()
-    df = pd.DataFrame()
 
-    net.apply(weight_init)
+optimizer = optim.Adam(net.parameters(), lr, (0.9, 0.999))
+scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True)
+criterion = nn.CrossEntropyLoss()
+df = pd.DataFrame()
+
+net.apply(weight_init)
 
     for epoch in range(0, epochs):
-
         net.train()
         epoch_loss = 0
         acc = 0
@@ -124,11 +118,18 @@ model_n = str(seed) + '_' + model_n
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32)
             imgs = Variable(imgs)
+            
+            # change class values to 0-4
+            # true_masks[true_masks == 7] = 0
+            # true_masks[true_masks == 10] = 1
+            # true_masks[true_masks == 13] = 2
+            # true_masks[true_masks == 16] = 3
+            # true_masks[true_masks == 17] = 4
 
             true_masks = Variable(true_masks.to(device=device, dtype=torch.long))
 
             # lulc classifer
-            output_list= net(imgs[:, :, 1:, :, :])
+            output_list= net(imgs[:, :, :, :, :]) # (b, t, c, w, h) #net(imgs[:, :, 1:, :, :]), lc not in train tiles
             # output_list = net(imgs)
             masks_pred = output_list[0]
             _, masks_pred_max = torch.max(masks_pred.data, 2)
@@ -156,7 +157,7 @@ model_n = str(seed) + '_' + model_n
             if i % 5 == 0:
                 print('Epoch [{} / {}], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,epochs,i+1,
                                                                                          loss.item(),batch_acc))
-        train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
+        train_record['train_loss'] = train_record['train_loss'] / len(train_loader) # why?
         train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
 
         print(train_record)
@@ -164,6 +165,7 @@ model_n = str(seed) + '_' + model_n
         # scheduler.step()
         # ===================================== Validation ====================================#
         with torch.no_grad():
+            # torch.no_grad()
             net.eval()
 
             val_record = {'val_kappa': 0, 'val_acc': 0, 'val_QA': 0}
@@ -199,33 +201,33 @@ model_n = str(seed) + '_' + model_n
 
                 pred_img_list = []
                 with torch.no_grad():
+                    #---# do we need all this? too many channels then
                     for test_img in sub_img_list:
                         #test_img = pre_prcessing(test_img)
-                            crop_img_lulc = test_img[:, 0, :, :]
-                            temp_list = []
-                            for j in range(crop_img_lulc.shape[0]):
-                                #temp = oh_code(crop_img_lulc[j], class_n=7)
-                                    oh_list = []
-                                    for i in range(class_n):
-                                        temp = torch.where(crop_img_lulc[j] == i, 1, 0)
-                                        oh_list.append(temp)
-                                    temp = torch.stack(oh_list,1)
+                        crop_img_lulc = torch.from_numpy(test_img[:, 0, :, :]) # land cover only
+                        temp_list = []
+                        for j in range(crop_img_lulc.shape[0]):
+                            #temp = oh_code(crop_img_lulc[j], class_n=7)
+                            oh_list = []
+                            class_n = 5
+                            for i in range(class_n):
                                 
-                                
-                                
-                                temp_list.append(temp[np.newaxis, :, :, :])
-                            oh_crop_img_lulc = np.concatenate(temp_list, axis=0)
-                            oh_crop_img = np.concatenate((oh_crop_img_lulc, test_img[:, 1:, :, :]), axis=1)
-                            test_img = oh_crop_img
+                                temp = torch.where(crop_img_lulc[j] == i, 1, 0)
+                                oh_list.append(temp)
+                            temp = torch.stack(oh_list,0) # should this be (oh_list, 0)?
+                            temp_list.append(temp[np.newaxis, :, :, :])
+                        oh_crop_img_lulc = np.concatenate(temp_list, axis=0) # from list of arrays to one array. (t, c, w, h)
+                        oh_crop_img = np.concatenate((oh_crop_img_lulc, test_img[:, 1:, :, :]), axis=1) # stack with all driving factors
+                        test_img = oh_crop_img
+                       #---# 
                         
                         
                         
-                        
-                        
-                        test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=torch.device('cuda'),
+                        # to tensor
+                        test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device, #torch.device('cuda'),
                                                                                                dtype=torch.float32)
 
-                        output_list = net(test_img[:, :, 1:, :, :])
+                        output_list = net(test_img[:, :, 1:, :, :]) # ERROR (b, t, c (5 classes + 6 driving factors), w, h)
                         masks_pred = output_list[0]
                         pred_prob = torch.softmax(torch.squeeze(masks_pred), dim=1).data.cpu().numpy()
                         pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:, :, :])
@@ -265,8 +267,8 @@ model_n = str(seed) + '_' + model_n
                         h += 1
 
                 #k, acc = evaluate(gt, pred_msk)
-                    k_statistics = cohen_kappa_score(gt.astype(np.int64).flatten(), pred_msk.astype(np.int64).flatten())
-                    acc_score = accuracy_score(gt.astype(np.int64).flatten(), pred_msk.astype(np.int64).flatten())
+                    k = cohen_kappa_score(gt.astype(np.int64).flatten(), pred_msk.astype(np.int64).flatten())
+                    acc = accuracy_score(gt.astype(np.int64).flatten(), pred_msk.astype(np.int64).flatten())
 
 
 
@@ -278,7 +280,7 @@ model_n = str(seed) + '_' + model_n
 
             val_record['val_kappa'] = k
             val_record['val_acc'] = acc
-            val_record['val_QA'] = QA
+            #val_record['val_QA'] = QA
 
             print(val_record)
 

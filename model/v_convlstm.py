@@ -54,12 +54,39 @@ class ConvLSTMCell(nn.Module):
 
 
 class ConvLSTM(nn.Module):
+    
+    """
+   Parameters:
+       input_dim: Number of channels in input
+       hidden_dim: Number of hidden channels
+       kernel_size: Size of kernel in convolutions
+       num_layers: Number of LSTM layers stacked on each other
+       batch_first: Whether or not dimension 0 is the batch or not
+       bias: Bias or no bias in Convolution
+       return_all_layers: Return the list of computations for all layers
+       Note: Will do same padding.
+   Input:
+       A tensor of size B, T, C, H, W or T, B, C, H, W
+   Output:
+       A tuple of two lists of length num_layers (or length 1 if return_all_layers is False).
+           0 - layer_output_list is the list of lists of length T of each output
+           1 - last_state_list is the list of last states
+                   each element of the list is a tuple (h, c) for hidden state and memory
+   Example:
+       >> x = torch.rand((32, 10, 64, 128, 128))
+       >> convlstm = ConvLSTM(64, 16, 3, 1, True, True, False)
+       >> _, last_states = convlstm(x)
+       >> h = last_states[0][0]  # 0 for layer index, 0 for h index
+   """
+    
+    
     def __init__(self, input_dim, hidden_dim, kernel_size, num_layers,
                  batch_first=False, bias=True, return_all_layers=False):
         super(ConvLSTM, self).__init__()
 
         self._check_kernel_size_consistency(kernel_size)
 
+ # Make sure that both `kernel_size` and `hidden_dim` are lists having len == num_layers
         kernel_size = self._extend_for_multilayer(kernel_size, num_layers)
         hidden_dim = self._extend_for_multilayer(hidden_dim, num_layers)
         if not len(kernel_size) == len(hidden_dim) == num_layers:
@@ -99,7 +126,7 @@ class ConvLSTM(nn.Module):
         last_state_list, layer_output
         """
 
-        if not self.batch_first:
+        if not self.batch_first: # change order if batch size is not first dimension
             # (t, b, c, h, w) -> (b, t, c, h, w) # batch size, time, channel, height, width
             input_tensor = input_tensor.permute(1, 0, 2, 3, 4)
         b, _, _, h, w = input_tensor.size()
@@ -113,7 +140,7 @@ class ConvLSTM(nn.Module):
         layer_output_list = []
         last_state_list = []
 
-        seq_len = input_tensor.size(1)
+        seq_len = input_tensor.size(1) # t, number of years
         cur_layer_input = input_tensor
 
         for layer_idx in range(self.num_layers):
