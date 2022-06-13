@@ -82,23 +82,24 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = './data/ori_data/211002_update_lulcmaps_withFactors_updated.npy'
+    ori_data_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c.npy'
 
-    ori_data = np.load(ori_data_dir).transpose((1, 0, 2, 3))
+    ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
                                                   scale_factor=(1 / 3, 1 / 3),
                                                   recompute_scale_factor=True)
     processed_ori_data = scaled_data.numpy()
-    valid_input = processed_ori_data[1:5, :, :, :]
-    gt = processed_ori_data[-1, 0, :, :]
+    valid_input = processed_ori_data[1:5, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
+    gt = processed_ori_data[-1, 0, :, :] # last year, land cover
     print('valid_sequence shape: ', valid_input.shape)
 
-    input_channel = 19
+    input_channel = 6 # 19
 
     df = pd.DataFrame()
     valid_record = {'kappa': 0, 'acc': 0}
 
-    dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
+    #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
+    dir_checkpoint = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ckpts/forward/No_seed_convLSTM/with_factors/CP_epoch9.pth"
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
@@ -111,11 +112,11 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for test_img in tqdm(sub_img_list):
-            test_img = pre_prcessing(test_img)
+            # test_img = pre_prcessing(test_img)
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
-            net = ConvGRU(input_dim=input_channel,
+            net = ConvLSTM(input_dim=input_channel,
                           hidden_dim=[32, 16, args.n_features],
                           kernel_size=(3, 3), num_layers=args.n_layer,
                           batch_first=True, bias=bias_status, return_all_layers=False)
@@ -123,7 +124,7 @@ if __name__ == '__main__':
             net.to(device)
             net.load_state_dict(torch.load(dir_checkpoint))
 
-            output_list = net(test_img[:,:,1:,::])
+            output_list = net(test_img[:,:,1:,::]) # 1: for all factors but lc
 
             masks_pred = output_list[0].view(args.seq_len, args.n_features, 256, 256)
             pred_prob = torch.softmax(torch.squeeze(masks_pred),dim=1).data.cpu().numpy()
@@ -145,7 +146,7 @@ if __name__ == '__main__':
     k, acc = evaluate(gt, pred_msk)
     print('kappa: ', k, 'acc: ', acc)
 
-    save_path = './test/{}/{}/{}/'
+    save_path = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/test/forward/No_seed_convLSTM/lulc_6y_6c/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
-    np.save(save_path+'{}_pred_msk.npy',pred_msk)
-    cv2.imwrite(save_path + '{}_pred_msk.png', color_annotation(pred_msk))
+    np.save(save_path + 'pred_msk.npy', pred_msk)
+    cv2.imwrite(save_path + 'pred_msk.png', color_annotation(pred_msk))

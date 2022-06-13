@@ -236,6 +236,6 @@ net = ConvLSTM(input_dim=input_channel,
 net.to(device)
 
 train_ConvGRU_FullValid(net=net, device=device,
-               epochs=5, batch_size=args.batch_size, lr=args.learn_rate,
+               epochs=10, batch_size=args.batch_size, lr=args.learn_rate,
                save_cp=True, save_csv=True, factor_option=factor,
                pred_seq=pred_sequence, model_n=model_n)
