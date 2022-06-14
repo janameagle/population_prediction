@@ -16,8 +16,8 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'
 
 def pre_prcessing(crop_img):
     crop_img_lulc = torch.from_numpy(crop_img[:, 0, :, :]) # was not converted to torch before, select lc
