@@ -20,11 +20,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def pre_prcessing(crop_img):
-    crop_img_lulc = torch.from_numpy(crop_img[:, 0, :, :]) # was not convertet to torch before
+    crop_img_lulc = torch.from_numpy(crop_img[:, 0, :, :]) # was not converted to torch before, select lc
     temp_list = []
-    for j in range(crop_img_lulc.shape[0]):
-        temp = oh_code(crop_img_lulc[j], class_n=7)
-        temp_list.append(temp[np.newaxis, :, :, :])
+    for j in range(crop_img_lulc.shape[0]): # for each year?
+        temp = oh_code(crop_img_lulc[j], class_n=7) # array of binary mask per class
+        temp_list.append(temp[np.newaxis, :, :, :]) # store class masks per year in list
     oh_crop_img_lulc = np.concatenate(temp_list, axis=0)
     oh_crop_img = np.concatenate((oh_crop_img_lulc, crop_img[:, 1:, :, :]), axis=1)
     return oh_crop_img
@@ -56,10 +56,10 @@ def get_subsample_centroids(img, img_size=50):
 
 def oh_code(a, class_n = 7):
     oh_list = []
-    for i in range(class_n):
-        temp = torch.where(a == i, 1, 0)
-        oh_list.append(temp)
-    return torch.stack(oh_list,0) #torch.stack(oh_list,1)
+    for i in range(class_n): # for each class
+        temp = torch.where(a == i, 1, 0) # binary mask per class
+        oh_list.append(temp) # store each class mask as list entry
+    return torch.stack(oh_list,0) #torch.stack(oh_list,1) # return array, not list
 
 def get_valid_dataset(ori_data_dir):
     ori_data = np.load(ori_data_dir)#.transpose((1, 0, 2, 3))
@@ -81,7 +81,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
     pred_img_list = []
     with torch.no_grad():
         for test_img in sub_img_list:
-            #test_img = pre_prcessing(test_img)
+            test_img = pre_prcessing(test_img)
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
@@ -115,11 +115,11 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
     args = get_args()
     dataset_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
     train_dir = dataset_dir + "train/"
-    pred = 'lulc_pred_6y_6c/'
+    pred = 'lulc_pred_6y_6c_no_na/'
     train_data = MyDataset(imgs_dir = train_dir + pred + 'input/',masks_dir = train_dir + pred +'target/')
     train_loader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True, num_workers= 0)
 
-    ori_data_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c.npy'
+    ori_data_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
 
 
     valid_input, gt = get_valid_dataset(ori_data_dir)
@@ -224,18 +224,18 @@ pred_sequence_list = ['forecasting'] #'backcasting'                        # wha
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
 
-input_channel = 6                                            # why 19?
+input_channel = 6                                            # 19 driving factors
 factor = 'with_factors'
 pred_sequence = 'forward'
-model_n = 'No_seed_convLSTM'
+model_n = 'No_seed_convLSTM_no_na'
 
 net = ConvLSTM(input_dim=input_channel,
-               hidden_dim=[32, 16, args.n_features], # hidden_dim=[32, 16, args.n_features]
+               hidden_dim=[32, 16, args.n_features], # hidden_dim = [32, 16, args.n_features]
                kernel_size=(3, 3), num_layers=args.n_layer,
                batch_first=True, bias=bias_status, return_all_layers=False)
 net.to(device)
 
 train_ConvGRU_FullValid(net=net, device=device,
-               epochs=10, batch_size=args.batch_size, lr=args.learn_rate,
+               epochs=5, batch_size=args.batch_size, lr=args.learn_rate,
                save_cp=True, save_csv=True, factor_option=factor,
                pred_seq=pred_sequence, model_n=model_n)

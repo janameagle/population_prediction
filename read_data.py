@@ -33,15 +33,15 @@ import numpy as np
 from skimage import io
 import matplotlib.pyplot as plt
 
-dat_in = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/18_input.npy')
-dat_targ = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/18_target.npy')
+# dat_in = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/18_input.npy')
+# dat_targ = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/18_target.npy')
 
-print(dat_in.shape)
-print(dat_targ.shape)
+# print(dat_in.shape)
+# print(dat_targ.shape)
 
 
 
-im = io.imread('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/brick_2001.tif')
+# im = io.imread('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/brick_2001.tif')
 # plot single layer as raster
 #plt.imshow(im[:,:,2])
 #print(im[0,0,:])
@@ -57,24 +57,24 @@ im = io.imread('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction
 
 
 # reshape to have 7 layers of 888x888 images each
-im_move = np.moveaxis(im, 2, 0)
+#im_move = np.moveaxis(im, 2, 0)
 #print(im_move.shape)
 #plt.imshow(im_move[4,:,:])
 
 
 # dat_multitemp = np.stack([a, b, c], axis=0)
-dat_multitemp = np.array([a, b, c])
+#dat_multitemp = np.array([a, b, c])
 
 
 
 # loop over years and stack all the data to retreive an array [20,7,888,888]:
 # seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
-seq = ['01', '02', '05', '10', '15', '20']
+seq = ['01', '04', '08', '12', '16', '20']
 dat_multitemp = np.zeros((6,7,888,888))
-i=0
 
+i=0
 for y in seq:
-   im = io.imread('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/brick_20' + y + '.tif')
+   im = io.imread('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/yearly_no_na/brick_20' + y + '.tif')
    im_move = np.moveaxis(im, 2, 0)
    dat_multitemp[i,:,:,:] = im_move
    i += 1
@@ -93,24 +93,24 @@ print(lc_multitemp)
 print(lc_multitemp.shape) # (lc, pop, urb_dist, slope, streets_dist, water_dist, center_dist)
 plt.imshow(lc_multitemp[1,0,:,:]) 
 
+# assign new class values
 lcnew_multitemp = lc_multitemp
-lcnew_multitemp[lc_multitemp == 7] = 0
-lcnew_multitemp[lc_multitemp == 9] = 1
-lcnew_multitemp[lc_multitemp == 10] = 2
-lcnew_multitemp[lc_multitemp == 12] = 3
-lcnew_multitemp[lc_multitemp == 13] = 4
-lcnew_multitemp[lc_multitemp == 16] = 5
-lcnew_multitemp[lc_multitemp == 17] = 6
+lcnew_multitemp[lc_multitemp == 7] = 0 # shrub
+lcnew_multitemp[lc_multitemp == 9] = 1 # savanna
+lcnew_multitemp[lc_multitemp == 10] = 2 # grassland
+lcnew_multitemp[lc_multitemp == 12] = 3 # croplands
+lcnew_multitemp[lc_multitemp == 13] = 4 # urban
+lcnew_multitemp[lc_multitemp == 16] = 5 # barren
+lcnew_multitemp[lc_multitemp == 17] = 6 # water
 np.unique(lcnew_multitemp[:, 0, :, :])
 
 # save stacked multitemporal image as numpy data
-np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c.npy', lc_multitemp)
+np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy', lc_multitemp)
 
 
 
 # slice the input data image
 
-full_image = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/input_all.npy')
 full_image = lcnew_multitemp
 h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]
@@ -120,7 +120,7 @@ img_size = 256 # how big the tiles should be
     #w_step = int(w_total // img_size * 1.5)
 
 x_list = np.linspace(img_size//2, h_total -(img_size//2), num = 14) # Return evenly spaced numbers over a specified interval
-y_list = np.linspace(img_size//2, w_total -(img_size//2), num= 14)
+y_list = np.linspace(img_size//2, w_total -(img_size//2), num = 14)
 new_x_list = []
 new_y_list = []
 
@@ -141,11 +141,8 @@ print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c/input/'+ str(i) + '_input.npy', sub_img_list[1][:,:,:,:])
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
-
-
-
+    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[1][:,:,:,:])
+    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
 
 
 

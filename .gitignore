@@ -2,3 +2,5 @@ data/
 *.Rhistory
 *.zip
 **/__pycache__/
+*.RData
+share/
