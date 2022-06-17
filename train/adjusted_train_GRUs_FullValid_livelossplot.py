@@ -14,10 +14,7 @@ from utilis.weight_init import weight_init
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import numpy as np
-
-
-proj_dir = "H:/Masterarbeit/Code/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 
 
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -92,6 +89,10 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
             output_list = net(test_img[:, :, 1:, :, :])
             masks_pred = output_list[0]
             pred_prob = torch.softmax(torch.squeeze(masks_pred), dim=1).data.cpu().numpy()
+            
+            criterion = nn.CrossEntropyLoss() # for validation loss
+            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), test_img[:,:,0,:,:].long()) # for validation loss
+            
             pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:, :, :])
             pred_img_list.append(pred_img)
     pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
@@ -108,7 +109,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
 
     k, acc = evaluate(gt, pred_msk)
 
-    return k, acc
+    return k, acc, loss
 
 
 def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
@@ -116,14 +117,15 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
                   save_cp=False, save_csv=True, factor_option='with_factors',
                   pred_seq='forward', model_n='No_seed_convLSTM'):
 
+    liveloss = PlotLosses()
     args = get_args()
-    dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
+    dataset_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
     train_dir = dataset_dir + "train/"
     pred = 'lulc_pred_6y_6c_no_na/'
     train_data = MyDataset(imgs_dir = train_dir + pred + 'input/',masks_dir = train_dir + pred +'target/')
     train_loader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True, num_workers= 0)
 
-    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
+    ori_data_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
 
 
     valid_input, gt = get_valid_dataset(ori_data_dir)
@@ -179,10 +181,13 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
             if i % 5 == 0:
                 print('Epoch [{} / {}], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,epochs,i+1,
                                                                                          loss.item(),batch_acc))
+        
         train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
         train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
         
         print(train_record)
+        
+        
         
         scheduler.step(batch_acc)
         # scheduler.step()
@@ -190,23 +195,31 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
         with torch.no_grad():
             net.eval()
 
-            val_record = {'val_kappa': 0, 'val_acc': 0, 'val_QA': 0}
+            val_record = {'val_kappa': 0, 'val_acc': 0, 'val_loss': 0}
             #k, acc, QA = get_valid_record(valid_input, gt, net, factor_option=factor_option)
-            k, acc = get_valid_record(valid_input, gt, net, factor_option=factor_option)
+            k, acc, loss = get_valid_record(valid_input, gt, net, factor_option=factor_option)
 
             val_record['val_kappa'] = k
             val_record['val_acc'] = acc
             #val_record['val_QA'] = QA
+            val_record['val_loss'] = loss
 
             print(val_record)
             
+        logs = {'train_loss': 0, 'train_acc': 0, 'val_loss': 0, 'val_acc': 0}
+        logs['train_loss'] = train_record['train_loss']
+        logs['train_acc'] = train_record['train_acc']
+        logs['val_loss'] = val_record['val_loss']
+        logs['val_acc'] = val_record['val_acc']
+        liveloss.update(logs)
+        liveloss.send()
 
         
 
         print('---------------------------------------------------------------------------------------------------------')
 
         if save_cp:
-            dir_checkpoint = proj_dir + "data/ckpts/{}/{}/{}/".format(pred_seq, model_n,factor_option)
+            dir_checkpoint = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ckpts/{}/{}/{}/".format(pred_seq, model_n,factor_option)
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
                        dir_checkpoint + f'CP_epoch{epoch}.pth')
@@ -216,7 +229,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
             train_record.update(val_record)
             record_df = pd.DataFrame(train_record, index=[epoch])
             df = df.append(record_df)
-            record_dir = proj_dir + 'data/record/{}/{}/{}/'.format(pred_seq,factor_option, model_n)
+            record_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/record/{}/{}/{}/'.format(pred_seq,factor_option, model_n)
             os.makedirs(record_dir, exist_ok=True)
             df.to_csv(record_dir + '{}_lr{}_layer{}.csv'.format(model_n,args.learn_rate, args.n_layer))
 
