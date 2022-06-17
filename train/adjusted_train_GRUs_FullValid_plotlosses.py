@@ -14,6 +14,8 @@ from utilis.weight_init import weight_init
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import numpy as np
+# from torch.utils.tensorboard import SummaryWriter # for plotting loss curves
+import matplotlib.pyplot as plt
 
 
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -130,6 +132,8 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
     df = pd.DataFrame()
 
     net.apply(weight_init)
+    
+    # writer = SummaryWriter() # for loss curve mapping
 
     for epoch in range(0, epochs):
 
@@ -175,8 +179,11 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
             if i % 5 == 0:
                 print('Epoch [{} / {}], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,epochs,i+1,
                                                                                          loss.item(),batch_acc))
-        train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
-        train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
+        # train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
+        # train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
+        train_losses.append(train_record['train_loss'] / len(train_loader))
+        
+        plt.plot(train_losses)
         
         print(train_record)
         
@@ -196,7 +203,9 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
             print(val_record)
             
-
+        # map val and train loss
+        # writer.add_scalar('training loss', train_record['train_loss'], epoch * len(train_loader))
+        # writer.add_figure('validation acc', train_record['val_acc'], epoch * len(train_loader))
         
 
         print('---------------------------------------------------------------------------------------------------------')
@@ -226,6 +235,7 @@ print(device)
 args = get_args()
 
 pred_sequence_list = ['forecasting'] #'backcasting'                        # what is backcasting? why do it?
+train_losses = [0]
 
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
@@ -243,5 +253,5 @@ net.to(device)
 
 train_ConvGRU_FullValid(net=net, device=device,
                epochs=5, batch_size=args.batch_size, lr=args.learn_rate,
-               save_cp=False, save_csv=True, factor_option=factor,
+               save_cp=True, save_csv=True, factor_option=factor,
                pred_seq=pred_sequence, model_n=model_n)

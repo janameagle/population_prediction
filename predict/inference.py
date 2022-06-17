@@ -124,6 +124,7 @@ if __name__ == '__main__':
 
             net.to(device)
             net.load_state_dict(torch.load(dir_checkpoint))
+            # net.eval() # added from Pytorch tutorial
 
             output_list = net(test_img[:,:,1:,::]) # 1: for all factors but lc
 
@@ -149,5 +150,5 @@ if __name__ == '__main__':
 
     save_path = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/test/forward/No_seed_convLSTM/lulc_6y_6c_no_na/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
-    np.save(save_path + 'pred_msk.npy', pred_msk)
-    cv2.imwrite(save_path + 'pred_msk.png', color_annotation(pred_msk))
+    np.save(save_path + 'pred_msk_eval.npy', pred_msk)
+    cv2.imwrite(save_path + 'pred_msk_eval.png', color_annotation(pred_msk))
