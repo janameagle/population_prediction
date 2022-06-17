@@ -4,6 +4,11 @@ Created on Mon May 30 13:39:02 2022
 
 @author: jmaie
 """
+proj_dir = "H:/Masterarbeit/Code/population_prediction/"
+# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+
+
+
 
 #from PIL import Image
 #import numpy as np
@@ -74,7 +79,7 @@ dat_multitemp = np.zeros((6,7,888,888))
 
 i=0
 for y in seq:
-   im = io.imread('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/yearly_no_na/brick_20' + y + '.tif')
+   im = io.imread(proj_dir + 'data/yearly_no_na/brick_20' + y + '.tif')
    im_move = np.moveaxis(im, 2, 0)
    dat_multitemp[i,:,:,:] = im_move
    i += 1
@@ -105,7 +110,7 @@ lcnew_multitemp[lc_multitemp == 17] = 6 # water
 np.unique(lcnew_multitemp[:, 0, :, :])
 
 # save stacked multitemporal image as numpy data
-np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy', lc_multitemp)
+np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy', lc_multitemp)
 
 
 
@@ -141,8 +146,8 @@ print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[1][:,:,:,:])
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[1][:,:,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
 
 
 

@@ -10,6 +10,11 @@ from sklearn.metrics import accuracy_score
 import pandas as pd
 from Documents.Masterarbeit.Code.population_prediction.model.v_convlstm import ConvLSTM
 
+
+proj_dir = "H:/Masterarbeit/Code/population_prediction/"
+# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+
+
 def evaluate(pred, gt):
     k_statistics = cohen_kappa_score(gt.astype(np.int64).flatten(), pred.astype(np.int64).flatten())
     acc_score = accuracy_score(gt.astype(np.int64).flatten(), pred.astype(np.int64).flatten())
@@ -82,7 +87,7 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     # scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
@@ -100,7 +105,7 @@ if __name__ == '__main__':
     valid_record = {'kappa': 0, 'acc': 0}
 
     #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
-    dir_checkpoint = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ckpts/forward/No_seed_convLSTM_no_na/with_factors/CP_epoch4.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/forward/No_seed_convLSTM_no_na/with_factors/CP_epoch4.pth"
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
@@ -147,7 +152,7 @@ if __name__ == '__main__':
     k, acc = evaluate(gt, pred_msk)
     print('kappa: ', k, 'acc: ', acc)
 
-    save_path = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/test/forward/No_seed_convLSTM/lulc_6y_6c_no_na/'#.format(pred_seq, model_n,factor_option)
+    save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/lulc_6y_6c_no_na/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk.npy', pred_msk)
     cv2.imwrite(save_path + 'pred_msk.png', color_annotation(pred_msk))
