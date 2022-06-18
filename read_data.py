@@ -4,7 +4,8 @@ Created on Mon May 30 13:39:02 2022
 
 @author: jmaie
 """
-proj_dir = "H:/Masterarbeit/Code/population_prediction/"
+data_dir = "H:/Masterarbeit/Code/population_prediction/"
+proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
@@ -79,7 +80,7 @@ dat_multitemp = np.zeros((6,7,888,888))
 
 i=0
 for y in seq:
-   im = io.imread(proj_dir + 'data/yearly_no_na/brick_20' + y + '.tif')
+   im = io.imread(data_dir + 'data/yearly/brick_20' + y + '.tif')
    im_move = np.moveaxis(im, 2, 0)
    dat_multitemp[i,:,:,:] = im_move
    i += 1
@@ -146,8 +147,8 @@ print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[1][:,:,:,:])
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
 
 
 

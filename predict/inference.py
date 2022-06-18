@@ -8,10 +8,10 @@ import cv2
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
-from Documents.Masterarbeit.Code.population_prediction.model.v_convlstm import ConvLSTM
+from model.v_convlstm import ConvLSTM
 
 
-proj_dir = "H:/Masterarbeit/Code/population_prediction/"
+proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
