@@ -141,8 +141,8 @@ print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[1][:,:,:,:])
-    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[1][:,0,:,:])
+    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
+    np.save('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
 
 
 

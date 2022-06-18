@@ -6,7 +6,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 class MyDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, augment = False):                  # what data are the images, and what the mask?
+    def __init__(self, imgs_dir, masks_dir, augment = False):                  
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.ids = [os.path.join(imgs_dir, x) for x in os.listdir(imgs_dir)]   # direction of images
@@ -40,25 +40,38 @@ class MyDataset(Dataset):
 
         return img, mask
 
-def min_max_scale(data): # used where?
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# def min_max_scale(data): # used where?
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     scaler = MinMaxScaler(feature_range=(0, 1))
+#     flat_data = data.reshape(-1, 1)                                            # what are the dimensions?
+#     scaler.fit(flat_data.cpu().numpy()) # compute min and max for later use
+#     new_data = scaler.transform(flat_data.cpu().numpy()) # compute new range
+#     if data.dim()==3:
+#         new_data = new_data.reshape(data.size(0),data.size(1),data.size(2))
+#     elif data.dim()==4:
+#         new_data = new_data.reshape(data.size(0),data.size(1),data.size(2),data.size(3))
+#     elif data.dim()==5:
+#         new_data = new_data.reshape(data.size(0),data.size(1),data.size(2),data.size(3),data.size(4))
+#     else:
+#         new_data = new_data
+
+#     return torch.from_numpy(new_data).to(device)
+
+
+
+def min_max_scale(img): # (b,t,c,w,h)
+    device = 'cpu'
     scaler = MinMaxScaler(feature_range=(0, 1))
-    flat_data = data.reshape(-1, 1)                                            # what are the dimensions?
-    scaler.fit(flat_data.cpu().numpy()) # compute min and max for later use
-    new_data = scaler.transform(flat_data.cpu().numpy()) # compute new range
-    if data.dim()==3:
-        new_data = new_data.reshape(data.size(0),data.size(1),data.size(2))
-    elif data.dim()==4:
-        new_data = new_data.reshape(data.size(0),data.size(1),data.size(2),data.size(3))
-    elif data.dim()==5:
-        new_data = new_data.reshape(data.size(0),data.size(1),data.size(2),data.size(3),data.size(4))
-    else:
-        new_data = new_data
+    data_new = np.zeros(img.shape)
+    data_new[:,:,0,:,:] = img[:,:,0,:,:]
 
-    return torch.from_numpy(new_data).to(device)
+    for i in range(1,img.shape[2]):
+        temp = img[:,:,i,:,:].reshape(-1,1)
+        scaler.fit(temp)
+        new_data = scaler.transform(temp)
+        new_data = new_data.reshape(img.shape[0], img.shape[1], img.shape[-2], img.shape[-1])
+        data_new[:,:,i,:,:] = new_data
 
-
-
-
+    return torch.from_numpy(np.float32(data_new)).to(device)
 
 

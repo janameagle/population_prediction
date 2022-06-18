@@ -9,6 +9,7 @@ from torch.autograd import Variable
 from torch.optim import lr_scheduler
 import pandas as pd
 from utilis.dataset import MyDataset
+from utilis.dataset import min_max_scale
 from train.options import get_args
 from utilis.weight_init import weight_init
 from sklearn.metrics import cohen_kappa_score
@@ -20,7 +21,7 @@ from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blo
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = 'cpu'
 
-def pre_prcessing(crop_img):
+def pre_prcessing(crop_img): # why?
     crop_img_lulc = torch.from_numpy(crop_img[:, 0, :, :]) # was not converted to torch before, select lc
     temp_list = []
     for j in range(crop_img_lulc.shape[0]): # for each year?
@@ -147,6 +148,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32)
+            imgs = min_max_scale(imgs) # added to scale all factors but the lc
             imgs = Variable(imgs)
 
             true_masks = Variable(true_masks.to(device=device, dtype=torch.long))
@@ -250,7 +252,7 @@ beta = 0                                                           # ?
 input_channel = 6                                            # 19 driving factors
 factor = 'with_factors'
 pred_sequence = 'forward'
-model_n = 'No_seed_convLSTM_no_na'
+model_n = 'No_seed_convLSTM_no_na_new_tiles'
 
 net = ConvLSTM(input_dim=input_channel,
                hidden_dim=[32, 16, args.n_features], # hidden_dim = [32, 16, args.n_features]
@@ -260,5 +262,5 @@ net.to(device)
 
 train_ConvGRU_FullValid(net=net, device=device,
                epochs=5, batch_size=args.batch_size, lr=args.learn_rate,
-               save_cp=False, save_csv=True, factor_option=factor,
+               save_cp=True, save_csv=True, factor_option=factor,
                pred_seq=pred_sequence, model_n=model_n)
