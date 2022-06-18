@@ -17,6 +17,8 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 
+proj_dir = "H:/Masterarbeit/population_prediction/"
+# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = 'cpu'
@@ -120,13 +122,13 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
     liveloss = PlotLosses()
     args = get_args()
-    dataset_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
+    dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
     train_dir = dataset_dir + "train/"
     pred = 'lulc_pred_6y_6c_no_na/'
     train_data = MyDataset(imgs_dir = train_dir + pred + 'input/',masks_dir = train_dir + pred +'target/')
     train_loader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True, num_workers= 0)
 
-    ori_data_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
+    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy"
 
 
     valid_input, gt = get_valid_dataset(ori_data_dir)
@@ -151,14 +153,14 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
             imgs = min_max_scale(imgs) # added to scale all factors but the lc
             imgs = Variable(imgs)
 
-            true_masks = Variable(true_masks.to(device=device, dtype=torch.long))
+            true_masks = Variable(true_masks.to(device=device, dtype=torch.long)) 
 
             # lulc classifer
-            output_list= net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc
+            output_list= net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
             # output_list = net(imgs)
             masks_pred = output_list[0]
             _, masks_pred_max = torch.max(masks_pred.data, 2)
-            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), true_masks)
+            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), true_masks) # 4 years, (b, c, t, w, h)
 
             epoch_loss += loss.item()
             optimizer.zero_grad() # set the gradients to zero
@@ -170,7 +172,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
             # get acc
             # _, masks_pred_max = torch.max(masks_pred.data, 2)
             pred_for_acc = masks_pred_max[:,-1,:,:]
-            true_masks_for_acc = true_masks[:,-1,:,:]
+            true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:]
 
             corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
             tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
@@ -221,7 +223,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
         print('---------------------------------------------------------------------------------------------------------')
 
         if save_cp:
-            dir_checkpoint = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/ckpts/{}/{}/{}/".format(pred_seq, model_n,factor_option)
+            dir_checkpoint = proj_dir + "data/ckpts/{}/{}/{}/".format(pred_seq, model_n,factor_option)
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
                        dir_checkpoint + f'CP_epoch{epoch}.pth')
@@ -231,7 +233,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
             train_record.update(val_record)
             record_df = pd.DataFrame(train_record, index=[epoch])
             df = df.append(record_df)
-            record_dir = 'C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/record/{}/{}/{}/'.format(pred_seq,factor_option, model_n)
+            record_dir = proj_dir + 'data/record/{}/{}/{}/'.format(pred_seq,factor_option, model_n)
             os.makedirs(record_dir, exist_ok=True)
             df.to_csv(record_dir + '{}_lr{}_layer{}.csv'.format(model_n,args.learn_rate, args.n_layer))
 
@@ -240,7 +242,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
 
 # from train_all script
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 args = get_args()
 
