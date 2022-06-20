@@ -4,9 +4,9 @@ Created on Mon May 30 13:39:02 2022
 
 @author: jmaie
 """
-data_dir = "H:/Masterarbeit/Code/population_prediction/"
-proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+# data_dir = "H:/Masterarbeit/Code/population_prediction/"
+# proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
 
@@ -100,7 +100,7 @@ dat_multitemp = np.zeros((6,7,888,888))
 
 i=0
 for y in seq:
-   im = io.imread(data_dir + 'data/yearly/brick_20' + y + '.tif')
+   im = io.imread(proj_dir + 'data/yearly/brick_20' + y + '.tif')
    im_move = np.moveaxis(im, 2, 0)
    dat_multitemp[i,:,:,:] = im_move
    i += 1
@@ -131,6 +131,8 @@ lcnew_multitemp[lc_multitemp == 17] = 6 # water
 np.unique(lcnew_multitemp[:, 0, :, :])
 
 
+
+# normalize values
 # lc_multitemp = min_max_scale(lc_multitemp)
 # save stacked multitemporal image as numpy data
 np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy', lc_multitemp)
@@ -138,7 +140,6 @@ np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy', lc_
 
 
 # slice the input data image
-
 full_image = lcnew_multitemp
 h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]

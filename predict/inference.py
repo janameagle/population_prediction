@@ -9,11 +9,15 @@ from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
 from model.v_convlstm import ConvLSTM
+<<<<<<< HEAD
 # from utilis.dataset import min_max_scale
+=======
+from utilis.dataset import min_max_scale
+>>>>>>> 0d9ae91eea2047ae730b81b7e83ab2536c1f6367
 
 
-proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+# proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
 def evaluate(pred, gt):
@@ -68,6 +72,8 @@ def color_annotation(image):
     color[image == 5] = [128, 128, 128]  # barren
     color[image == 6] = [255, 128, 0]  # water
     return color
+
+
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train ConvLSTM Models', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -153,10 +159,12 @@ if __name__ == '__main__':
             pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
             h += 1
 
-    k, acc = evaluate(gt, pred_msk)
+    k, acc = evaluate(pred_msk, gt)
     print('kappa: ', k, 'acc: ', acc)
 
+
     save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_norm/'#.format(pred_seq, model_n,factor_option)
+    # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval.npy', pred_msk)
     cv2.imwrite(save_path + 'pred_msk_eval.png', color_annotation(pred_msk))
