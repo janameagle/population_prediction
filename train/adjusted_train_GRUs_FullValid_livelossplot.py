@@ -89,7 +89,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
-            output_list = net(test_img[:, :, 1:, :, :])
+            output_list = net(test_img[:, :, 1:, :, :]) # all except lc
             masks_pred = output_list[0]
             pred_prob = torch.softmax(torch.squeeze(masks_pred), dim=1).data.cpu().numpy()
             
@@ -150,7 +150,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32)
-            imgs = min_max_scale(imgs) # added to scale all factors but the lc
+            # imgs = min_max_scale(imgs) # added to scale all factors but the lc
             imgs = Variable(imgs)
 
             true_masks = Variable(true_masks.to(device=device, dtype=torch.long)) 
@@ -254,7 +254,7 @@ beta = 0                                                           # ?
 input_channel = 6                                            # 19 driving factors
 factor = 'with_factors'
 pred_sequence = 'forward'
-model_n = 'No_seed_convLSTM_no_na_new_tiles'
+model_n = 'No_seed_convLSTM_no_na_50e'
 
 net = ConvLSTM(input_dim=input_channel,
                hidden_dim=[32, 16, args.n_features], # hidden_dim = [32, 16, args.n_features]
@@ -263,6 +263,6 @@ net = ConvLSTM(input_dim=input_channel,
 net.to(device)
 
 train_ConvGRU_FullValid(net=net, device=device,
-               epochs=5, batch_size=args.batch_size, lr=args.learn_rate,
+               epochs=50, batch_size=args.batch_size, lr=args.learn_rate,
                save_cp=True, save_csv=True, factor_option=factor,
                pred_seq=pred_sequence, model_n=model_n)

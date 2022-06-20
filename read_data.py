@@ -38,6 +38,26 @@ proj_dir = "H:/Masterarbeit/population_prediction/"
 import numpy as np
 from skimage import io
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+# import torch
+
+
+def min_max_scale(img): # (t,c,w,h)
+    # device = 'cpu'
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    data_new = np.zeros(img.shape)
+    data_new[:,0,:,:] = img[:,0,:,:]
+
+    for i in range(1,img.shape[1]):
+        temp = img[:,i,:,:].reshape(-1,1)
+        scaler.fit(temp)
+        new_data = scaler.transform(temp)
+        new_data = new_data.reshape(img.shape[0], img.shape[-2], img.shape[-1])
+        data_new[:,i,:,:] = new_data
+
+    return np.float32(data_new)
+
+
 
 # dat_in = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/18_input.npy')
 # dat_targ = np.load('C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/data/18_target.npy')
@@ -110,8 +130,10 @@ lcnew_multitemp[lc_multitemp == 16] = 5 # barren
 lcnew_multitemp[lc_multitemp == 17] = 6 # water
 np.unique(lcnew_multitemp[:, 0, :, :])
 
+
+# lc_multitemp = min_max_scale(lc_multitemp)
 # save stacked multitemporal image as numpy data
-np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy', lc_multitemp)
+np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy', lc_multitemp)
 
 
 
@@ -147,8 +169,8 @@ print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na_norm/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na_norm/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
 
 
 

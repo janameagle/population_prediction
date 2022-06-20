@@ -22,7 +22,7 @@ class MyDataset(Dataset):
 
         if self.aug == True: # create random augmentation -> random subimage
             img_size = img.shape[-1] # width or height
-            crop_size = 256
+            crop_size = 25
             w_random = np.random.randint(img_size - crop_size) # one random nr, why imgs-crops?
             h_random = np.random.randint(img_size - crop_size)
             img = img[:, :, w_random:w_random + crop_size, h_random:h_random + crop_size] # why + crop size?

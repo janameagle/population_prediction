@@ -9,6 +9,7 @@ from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
 from model.v_convlstm import ConvLSTM
+# from utilis.dataset import min_max_scale
 
 
 proj_dir = "H:/Masterarbeit/population_prediction/"
@@ -59,13 +60,13 @@ def pre_prcessing(crop_img):
 
 def color_annotation(image):
     color = np.ones([image.shape[0], image.shape[1], 3])
-    color[image == 0] = [0, 0, 0]  # bg
-    color[image == 1] = [204, 104, 0]  # water
-    color[image == 2] = [0, 153, 0]  # vegatation
-    color[image == 3] = [0, 76, 153]  # soil
-    color[image == 4] = [192, 192, 192]  # impervious
-    color[image == 5] = [102, 0, 204]  # formal
-    color[image == 6] = [0, 255, 255]  # informal
+    color[image == 0] = [0, 102, 0]  # shrub
+    color[image == 1] = [0, 255, 255]  # savanna
+    color[image == 2] = [0, 204, 0]  # grassland
+    color[image == 3] = [0, 128, 255]  # croplands
+    color[image == 4] = [0, 0, 255]  # urban
+    color[image == 5] = [128, 128, 128]  # barren
+    color[image == 6] = [255, 128, 0]  # water
     return color
 
 def get_args():
@@ -81,13 +82,14 @@ def get_args():
 
 
 if __name__ == '__main__':
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     args = get_args()
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     # scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
@@ -105,7 +107,7 @@ if __name__ == '__main__':
     valid_record = {'kappa': 0, 'acc': 0}
 
     #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
-    dir_checkpoint = proj_dir + "data/ckpts/forward/No_seed_convLSTM_no_na/with_factors/CP_epoch4.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/forward/No_seed_convLSTM_no_na_norm/with_factors/CP_epoch9.pth"
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
@@ -121,6 +123,7 @@ if __name__ == '__main__':
             # test_img = pre_prcessing(test_img)
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
+            # test_img = min_max_scale(test_img) # added to scale all factors but the lc
 
             net = ConvLSTM(input_dim=input_channel,
                           hidden_dim=[32, 16, args.n_features],
@@ -153,7 +156,7 @@ if __name__ == '__main__':
     k, acc = evaluate(gt, pred_msk)
     print('kappa: ', k, 'acc: ', acc)
 
-    save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/lulc_6y_6c_no_na/'#.format(pred_seq, model_n,factor_option)
+    save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_norm/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval.npy', pred_msk)
     cv2.imwrite(save_path + 'pred_msk_eval.png', color_annotation(pred_msk))
