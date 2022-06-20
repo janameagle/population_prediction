@@ -17,8 +17,8 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 
-proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+# proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = 'cpu'
@@ -128,7 +128,7 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
     train_data = MyDataset(imgs_dir = train_dir + pred + 'input/',masks_dir = train_dir + pred +'target/')
     train_loader = DataLoader(dataset=train_data, batch_size=batch_size, shuffle=True, num_workers= 0)
 
-    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy"
+    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy"
 
 
     valid_input, gt = get_valid_dataset(ori_data_dir)
@@ -146,11 +146,10 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
         epoch_loss = 0
         acc = 0
         train_record = {'train_loss': 0, 'train_acc': 0}
-        
 
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32)
-            imgs = min_max_scale(imgs) # added to scale all factors but the lc
+            # imgs = min_max_scale(imgs) # added to scale all factors but the lc
             imgs = Variable(imgs)
 
             true_masks = Variable(true_masks.to(device=device, dtype=torch.long)) 
@@ -191,8 +190,8 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
         
         print(train_record)
         
-        
-        
+     
+
         scheduler.step(batch_acc)
         # scheduler.step()
         # ===================================== Validation ====================================#
@@ -209,14 +208,22 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
             val_record['val_loss'] = loss
 
             print(val_record)
-            
-        logs = {'train_loss': 0, 'train_acc': 0, 'val_loss': 0, 'val_acc': 0}
-        logs['train_loss'] = train_record['train_loss']
-        logs['train_acc'] = train_record['train_acc']
-        logs['val_loss'] = val_record['val_loss']
-        logs['val_acc'] = val_record['val_acc']
-        liveloss.update(logs)
-        liveloss.send()
+         
+            liveloss.update({
+                'acc': train_record['train_acc'],
+                'val_acc': val_record['val_acc'],
+                'loss': train_record['train_loss'],
+                'val_loss': val_record['val_loss']
+                })
+            liveloss.send()   
+         
+        # logs = {'train_loss': 0, 'train_acc': 0, 'val_loss': 0, 'val_acc': 0}
+        # logs['train_loss'] = train_record['train_loss']
+        # logs['train_acc'] = train_record['train_acc']
+        # logs['val_loss'] = val_record['val_loss']
+        # logs['val_acc'] = val_record['val_acc']
+        # liveloss.update(logs)
+        # liveloss.send()
 
         
 
@@ -254,7 +261,7 @@ beta = 0                                                           # ?
 input_channel = 6                                            # 19 driving factors
 factor = 'with_factors'
 pred_sequence = 'forward'
-model_n = 'No_seed_convLSTM_no_na_new_tiles'
+model_n = 'No_seed_convLSTM_no_na_normed_clean_tiles'
 
 net = ConvLSTM(input_dim=input_channel,
                hidden_dim=[32, 16, args.n_features], # hidden_dim = [32, 16, args.n_features]
