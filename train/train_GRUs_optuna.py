@@ -1,3 +1,17 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jun 23 12:42:32 2022
+
+@author: jmaie
+"""
+
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jun 23 09:05:26 2022
+
+@author: jmaie
+"""
+
 from model.v_convlstm import ConvLSTM
 import os
 import torch
@@ -262,15 +276,152 @@ input_channel = 6                                            # 19 driving factor
 factor = 'with_factors'
 pred_sequence = 'forward'
 
-model_n = 'No_seed_convLSTM_no_na_lr003_layer2_16'
+epochs = 15
+model_n = 'No_seed_convLSTM_no_na_optuna'
 
-net = ConvLSTM(input_dim=input_channel,
-               hidden_dim=[16, args.n_features], # hidden_dim = [32, 16, args.n_features]
-               kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
-               batch_first=True, bias=bias_status, return_all_layers=False)
-net.to(device)
+# net = ConvLSTM(input_dim=input_channel,
+#                hidden_dim=[16, args.n_features], # hidden_dim = [32, 16, args.n_features]
+#                kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
+#                batch_first=True, bias=bias_status, return_all_layers=False)
+# net.to(device)
 
-train_ConvGRU_FullValid(net=net, device=device,
-               epochs=5, batch_size=args.batch_size, lr=args.learn_rate,
-               save_cp=True, save_csv=True, factor_option=factor,
-               pred_seq=pred_sequence, model_n=model_n)
+# train_ConvGRU_FullValid(net=net, device=device,
+#                epochs=5, batch_size=args.batch_size, lr=args.learn_rate,
+#                save_cp=True, save_csv=True, factor_option=factor,
+#                pred_seq=pred_sequence, model_n=model_n)
+
+
+
+# new train function for optuna
+import optuna
+
+def train_convGRU(trial):
+    # try different sizes of the hidden layer
+    layer_sz = 2**trial.suggest_int("layer_sz", 2, 9) # value between 2^2 and 2^9
+    
+    
+    args = get_args()
+    # net = ConvLSTM(trial)
+    net = ConvLSTM(input_dim = input_channel,
+                   hidden_dim = [layer_sz, args.n_features], # hidden_dim = [32, 16, args.n_features]
+                   kernel_size = (3, 3), num_layers = 2, # num_layers=args.n_layer,
+                   batch_first = True, bias = bias_status, return_all_layers=False)
+    
+    net.to(device)
+    
+    # try different batch sizes
+    batch_size = trial.suggest_int('batch_size', 1, 12)
+    
+    dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
+    train_dir = dataset_dir + "train/lulc_pred_6y_6c_no_na/"
+    train_data = MyDataset(imgs_dir = train_dir + 'input/',masks_dir = train_dir +'target/')
+    train_loader = DataLoader(dataset=train_data, batch_size = batch_size, shuffle=True, num_workers= 0)
+
+    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy"
+    valid_input, gt = get_valid_dataset(ori_data_dir)
+    
+    # try different learning rates
+    lr = trial.suggest_float("lr", 1e-5, 1e-1, log = True)
+    optimizer = optim.Adam(net.parameters(), lr, (0.9, 0.999)) # varying momentum?
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True) # varying lr?
+    criterion = nn.CrossEntropyLoss()
+
+    net.apply(weight_init)
+    for epoch in range(0, epochs):
+
+        net.train()
+        epoch_loss = 0
+        acc = 0
+        train_record = {'train_loss': 0, 'train_acc': 0}
+
+        for i, (imgs, true_masks) in enumerate(train_loader):
+            imgs = imgs.to(device=device, dtype=torch.float32)
+            # imgs = min_max_scale(imgs) # added to scale all factors but the lc
+            imgs = Variable(imgs)
+
+            true_masks = Variable(true_masks.to(device=device, dtype=torch.long)) 
+
+            # lulc classifer
+            output_list= net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
+            # output_list = net(imgs)
+            masks_pred = output_list[0]
+            _, masks_pred_max = torch.max(masks_pred.data, 2)
+            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), true_masks) # 4 years, (b, c, t, w, h)
+
+            epoch_loss += loss.item()
+            optimizer.zero_grad() # set the gradients to zero
+            loss.backward()
+
+            optimizer.step()
+
+            # get acc
+            # _, masks_pred_max = torch.max(masks_pred.data, 2)
+            pred_for_acc = masks_pred_max[:,-1,:,:]
+            true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:]
+
+            corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
+            tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
+            acc += float(corr) / float(tensor_size)
+            batch_acc = acc/(i+1)
+
+            train_record['train_loss'] += loss.item()
+            train_record['train_acc'] += batch_acc
+
+            if i % 5 == 0:
+                print('Epoch [{} / {}], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,epochs,i+1,
+                                                                                         loss.item(),batch_acc))
+            trial.report(train_record['train_acc'], epoch)
+            # handle pruning based on the intermediate value
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+            
+        train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
+        train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
+        
+        print(train_record)
+
+        scheduler.step(batch_acc)
+        # scheduler.step()
+        
+        return train_record['train_acc']
+        
+
+
+if __name__ == "__main__":
+    study = optuna.create_study(direction='maximize')
+    study.optimize(train_convGRU, n_trials = 20)
+    
+    pruned_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
+    complete_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+    
+    print('Study statistics: ')
+    print(' Nr of finished trials: ', len(study.trial))
+    print(' Nr of pruned trials: ', len(pruned_trials))
+    print(' Nr of complete trials: ', lend(complete_trials))
+    
+    print('Best trial:')
+    trial = study.best_trial
+    
+    print(' Value: ', trial.value)
+    print(' Params: ')
+    for key, value in trial.params.items():
+        print(' {}: {}'.format(key,value))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -9,11 +9,8 @@ from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
 from model.v_convlstm import ConvLSTM
-<<<<<<< HEAD
-# from utilis.dataset import min_max_scale
-=======
 from utilis.dataset import min_max_scale
->>>>>>> 0d9ae91eea2047ae730b81b7e83ab2536c1f6367
+
 
 
 # proj_dir = "H:/Masterarbeit/population_prediction/"
@@ -95,7 +92,7 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     # scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
@@ -113,7 +110,7 @@ if __name__ == '__main__':
     valid_record = {'kappa': 0, 'acc': 0}
 
     #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
-    dir_checkpoint = proj_dir + "data/ckpts/forward/No_seed_convLSTM_no_na_norm/with_factors/CP_epoch9.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/forward/No_seed_convLSTM_no_na_lr003_layer2_16/with_factors/CP_epoch4.pth"
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
@@ -132,8 +129,8 @@ if __name__ == '__main__':
             # test_img = min_max_scale(test_img) # added to scale all factors but the lc
 
             net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[32, 16, args.n_features],
-                          kernel_size=(3, 3), num_layers=args.n_layer,
+                          hidden_dim = [16, args.n_features], # hidden_dim=[32, 16, args.n_features],
+                          kernel_size=(3, 3), num_layers=2,
                           batch_first=True, bias=bias_status, return_all_layers=False)
 
             net.to(device)
@@ -163,7 +160,7 @@ if __name__ == '__main__':
     print('kappa: ', k, 'acc: ', acc)
 
 
-    save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_norm/'#.format(pred_seq, model_n,factor_option)
+    save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_lr003_layer2_16/'#.format(pred_seq, model_n,factor_option)
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval.npy', pred_msk)
