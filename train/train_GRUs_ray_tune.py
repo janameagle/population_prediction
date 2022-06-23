@@ -1,3 +1,26 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jun 22 10:07:51 2022
+
+@author: maie_ja
+"""
+
+# import GPUtil
+
+# GPUtil.getAvailable()
+
+# import torch
+# use_cuda = torch.cuda.is_available()
+# print(use_cuda)
+
+# if use_cuda:
+#     print('__CUDNN VERSION:', torch.backends.cudnn.version())
+#     print('__Number CUDA Devices:', torch.cuda.device_count())
+#     print('__CUDA Device Name:',torch.cuda.get_device_name(0))
+#     print('__CUDA Device Total Memory [GB]:',torch.cuda.get_device_properties(0).total_memory/1e9)
+    
+    
+    
 from model.v_convlstm import ConvLSTM
 import os
 import torch
@@ -9,7 +32,7 @@ from torch.autograd import Variable
 from torch.optim import lr_scheduler
 import pandas as pd
 from utilis.dataset import MyDataset
-from utilis.dataset import min_max_scale
+# from utilis.dataset import min_max_scale
 from train.options import get_args
 from utilis.weight_init import weight_init
 from sklearn.metrics import cohen_kappa_score
@@ -249,12 +272,9 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
 
 # from train_all script
-#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 args = get_args()
-
 pred_sequence_list = ['forecasting'] #'backcasting'                        # what is backcasting? why do it?
-
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
 
@@ -262,15 +282,185 @@ input_channel = 6                                            # 19 driving factor
 factor = 'with_factors'
 pred_sequence = 'forward'
 
-model_n = 'No_seed_convLSTM_no_na_lr003_layer2'
+model_n = 'No_seed_convLSTM_no_na_ray_tune'
 
-net = ConvLSTM(input_dim=input_channel,
-               hidden_dim=[16, args.n_features], # hidden_dim = [32, 16, args.n_features]
-               kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
-               batch_first=True, bias=bias_status, return_all_layers=False)
-net.to(device)
+# net = ConvLSTM(input_dim=input_channel,
+#                hidden_dim=[16, args.n_features], # hidden_dim = [32, 16, args.n_features]
+#                kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
+#                batch_first=True, bias=bias_status, return_all_layers=False)
+# net.to(device)
 
-train_ConvGRU_FullValid(net=net, device=device,
-               epochs=25, batch_size=args.batch_size, lr=args.learn_rate,
-               save_cp=True, save_csv=True, factor_option=factor,
-               pred_seq=pred_sequence, model_n=model_n)
+# train_ConvGRU_FullValid(net=net, device=device,
+#                epochs=25, batch_size=args.batch_size, lr=args.learn_rate,
+#                save_cp=False, save_csv=False, factor_option=factor,
+#                pred_seq=pred_sequence, model_n=model_n)
+
+
+
+def train_ConvGRU(config):
+    dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
+    train_dir = dataset_dir + "train/lulc_pred_6y_6c_no_na/"
+    train_data = MyDataset(imgs_dir = train_dir + 'input/',masks_dir = train_dir +'target/')
+    train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
+    
+    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy"
+    valid_input, gt = get_valid_dataset(ori_data_dir)
+    
+    # change to config here
+    net = ConvLSTM(input_dim = input_channel,
+                   hidden_dim=[config['l1'], config['l2'], args.n_features], # hidden_dim = [32, 16, args.n_features]
+                   kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
+                   batch_first=True, bias=bias_status, return_all_layers=False)
+    net.to(device)
+    
+    optimizer = optim.Adam(net.parameters(), lr = config['lr'], betas = (0.9, 0.999))
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True)
+    criterion = nn.CrossEntropyLoss()
+
+    net.apply(weight_init)
+    
+    for epoch in range(0, 15):
+
+        net.train()
+        epoch_loss = 0
+        acc = 0
+        train_record = {'train_loss': 0, 'train_acc': 0}
+
+        for i, (imgs, true_masks) in enumerate(train_loader):
+            imgs = imgs.to(device=device, dtype=torch.float32)
+            # imgs = min_max_scale(imgs) # added to scale all factors but the lc
+            imgs = Variable(imgs)
+
+            true_masks = Variable(true_masks.to(device=device, dtype=torch.long)) 
+
+            # lulc classifer
+            output_list = net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
+            # output_list = net(imgs)
+            masks_pred = output_list[0]
+            _, masks_pred_max = torch.max(masks_pred.data, 2)
+            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), true_masks) # 4 years, (b, c, t, w, h)
+
+            epoch_loss += loss.item()
+            optimizer.zero_grad() # set the gradients to zero
+            loss.backward()
+
+            optimizer.step()
+
+            # get acc
+            # _, masks_pred_max = torch.max(masks_pred.data, 2)
+            pred_for_acc = masks_pred_max[:,-1,:,:]
+            true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:]
+
+            corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
+            tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
+            acc += float(corr) / float(tensor_size)
+            batch_acc = acc/(i+1)
+
+            train_record['train_loss'] += loss.item()
+            train_record['train_acc'] += batch_acc
+
+            if i % 5 == 0:
+                print('Epoch [{} / 15], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,i+1,
+                                                                                         loss.item(),batch_acc))
+        
+        train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
+        train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
+        
+        print(train_record)
+        
+        scheduler.step(batch_acc)
+        # scheduler.step()
+        # ===================================== Validation ====================================#
+        with torch.no_grad():
+            net.eval()
+
+            val_record = {'val_kappa': 0, 'val_acc': 0, 'val_loss': 0}
+            #k, acc, QA = get_valid_record(valid_input, gt, net, factor_option=factor_option)
+            k, acc, loss = get_valid_record(valid_input, gt, net, factor_option='with_factors')
+
+            val_record['val_kappa'] = k
+            val_record['val_acc'] = acc
+            #val_record['val_QA'] = QA
+            val_record['val_loss'] = loss
+
+            print(val_record)
+         
+            # liveloss.update({
+            #     'acc': train_record['train_acc'],
+            #     'val_acc': val_record['val_acc'],
+            #     'loss': train_record['train_loss'],
+            #     'val_loss': val_record['val_loss']
+            #     })
+            # liveloss.send()   
+
+
+
+# ray tune
+from ray import tune
+from ray.tune import CLIReporter
+# from ray.tune.schedulers import ASHAScheduler # not used yet, but lr_scheduler
+
+# define hyperparameters to tune
+config = {
+        "l1": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
+        "l2": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
+        "lr": tune.loguniform(1e-4, 1e-1),
+        "batch_size": tune.choice([2, 4, 8, 12])
+    }
+
+# The tune.sample_from() function makes it possible to define your own sample methods to obtain hyperparameters. 
+# In this example, the l1 and l2 parameters should be powers of 2 between 4 and 256, so either 4, 8, 16, 32, 64, 128, or 256. 
+# The lr (learning rate) should be uniformly sampled between 0.0001 and 0.1. 
+# Lastly, the batch size is a choice between 2, 4, 8, and 16.
+
+
+reporter = CLIReporter(
+        # parameter_columns=["l1", "l2", "lr", "batch_size"],
+        metric_columns=["loss", "accuracy", "training_iteration"])
+
+result = tune.run(
+        train_ConvGRU,
+        # partial(train_cifar, data_dir=data_dir),
+        resources_per_trial={"gpu": 1},
+        config = config,
+        # num_samples=num_samples,
+        # scheduler=scheduler,
+        progress_reporter=reporter)
+
+
+# short output
+print("Best config is:", result.best_config)
+
+
+# #long output
+# best_trial = result.get_best_trial("loss", "min", "last")
+# print("Best trial config: {}".format(best_trial.config))
+# print("Best trial final validation loss: {}".format(
+#     best_trial.last_result["loss"]))
+# print("Best trial final validation accuracy: {}".format(
+#     best_trial.last_result["accuracy"]))
+
+# best_trained_model = net(best_trial.config["l1"], best_trial.config["l2"])
+# device = "cpu"
+# if torch.cuda.is_available():
+#     device = "cuda:0"
+# best_trained_model.to(device)
+
+# best_checkpoint_dir = best_trial.checkpoint.value
+# model_state, optimizer_state = torch.load(os.path.join(
+#     best_checkpoint_dir, "checkpoint"))
+# best_trained_model.load_state_dict(model_state)
+
+# # test_acc = test_accuracy(best_trained_model, device)
+# # print("Best trial test set accuracy: {}".format(test_acc))
+
+
+
+
+
+
+
+
+
+
+
