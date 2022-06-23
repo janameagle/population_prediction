@@ -12,7 +12,6 @@ from model.v_convlstm import ConvLSTM
 from utilis.dataset import min_max_scale
 
 
-
 proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
@@ -111,6 +110,7 @@ if __name__ == '__main__':
 
     #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
     dir_checkpoint = proj_dir + "data/ckpts/forward/No_seed_convLSTM_no_na_lr003_layer2/with_factors/CP_epoch24.pth"
+
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
@@ -161,6 +161,7 @@ if __name__ == '__main__':
 
 
     save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_lr003_layer2/'#.format(pred_seq, model_n,factor_option)
+
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval.npy', pred_msk)

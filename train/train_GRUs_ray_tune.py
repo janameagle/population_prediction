@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+<<<<<<< HEAD
 Created on Wed Jun 22 10:07:51 2022
 
 @author: maie_ja
@@ -40,11 +41,12 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 
-proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# device = 'cpu'
+# proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'
 
 def pre_prcessing(crop_img): # why?
     crop_img_lulc = torch.from_numpy(crop_img[:, 0, :, :]) # was not converted to torch before, select lc
@@ -156,8 +158,9 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
     valid_input, gt = get_valid_dataset(ori_data_dir)
 
-    optimizer = optim.Adam(net.parameters(), lr, (0.9, 0.999))
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True)
+
+    optimizer = optim.Adam(net.parameters(), lr, (0.9, 0.999)) # varying momentum?
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True) # varying lr?
     criterion = nn.CrossEntropyLoss()
     df = pd.DataFrame()
 
@@ -272,9 +275,13 @@ def train_ConvGRU_FullValid(net = ConvLSTM, device = torch.device('cuda'),
 
 
 # from train_all script
+
+#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 args = get_args()
+
 pred_sequence_list = ['forecasting'] #'backcasting'                        # what is backcasting? why do it?
+
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
 
@@ -291,12 +298,14 @@ model_n = 'No_seed_convLSTM_no_na_ray_tune'
 # net.to(device)
 
 # train_ConvGRU_FullValid(net=net, device=device,
+
 #                epochs=25, batch_size=args.batch_size, lr=args.learn_rate,
 #                save_cp=False, save_csv=False, factor_option=factor,
 #                pred_seq=pred_sequence, model_n=model_n)
 
 
 
+<<<<<<< HEAD
 def train_ConvGRU(config):
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
     train_dir = dataset_dir + "train/lulc_pred_6y_6c_no_na/"
@@ -320,7 +329,6 @@ def train_ConvGRU(config):
     net.apply(weight_init)
     
     for epoch in range(0, 15):
-
         net.train()
         epoch_loss = 0
         acc = 0
@@ -360,6 +368,7 @@ def train_ConvGRU(config):
             train_record['train_acc'] += batch_acc
 
             if i % 5 == 0:
+
                 print('Epoch [{} / 15], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,i+1,
                                                                                          loss.item(),batch_acc))
         
@@ -408,11 +417,11 @@ config = {
         "batch_size": tune.choice([2, 4, 8, 12])
     }
 
+
 # The tune.sample_from() function makes it possible to define your own sample methods to obtain hyperparameters. 
 # In this example, the l1 and l2 parameters should be powers of 2 between 4 and 256, so either 4, 8, 16, 32, 64, 128, or 256. 
 # The lr (learning rate) should be uniformly sampled between 0.0001 and 0.1. 
 # Lastly, the batch size is a choice between 2, 4, 8, and 16.
-
 
 reporter = CLIReporter(
         # parameter_columns=["l1", "l2", "lr", "batch_size"],
