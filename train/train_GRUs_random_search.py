@@ -7,15 +7,15 @@ Created on Thu Jun 23 12:42:32 2022
 
 
 from model.v_convlstm import ConvLSTM
-# import os
+import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import torch.optim as optim
-# import logging
+import logging
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
-# import pandas as pd
+import pandas as pd
 from utilis.dataset import MyDataset
 # from utilis.dataset import min_max_scale
 from train.options import get_args
@@ -23,8 +23,9 @@ from utilis.weight_init import weight_init
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import numpy as np
-# from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
+from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 from GPUtil import showUtilization as gpu_usage
+import random
 
 
 print("initial usage")
@@ -100,7 +101,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
         for test_img in sub_img_list:
             # test_img = pre_prcessing(test_img)
             # test_imag = Variable(...)
-            test_img = torch.from_numpy(test_img.copy()).unsqueeze(0).to(device=device,
+            test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
             output_list = net(test_img[:, :, 1:, :, :]) # all except lc
@@ -109,6 +110,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
             
             criterion = nn.CrossEntropyLoss() # for validation loss
             loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), test_img[:,:,0,:,:].long()) # for validation loss
+            
             
             pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:, :, :])
             pred_img_list.append(pred_img)
@@ -126,7 +128,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
 
     k, acc = evaluate(gt, pred_msk)
 
-    return k, acc, loss
+    return k, acc, loss.item()
 
 
 
@@ -136,7 +138,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
 print(device)
 args = get_args()
 
-pred_sequence_list = ['forecasting'] #'backcasting'                        # what is backcasting? why do it?
+# pred_sequence_list = ['forecasting'] #'backcasting'                        # what is backcasting? why do it?
 
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
@@ -145,8 +147,8 @@ input_channel = 6                                            # 19 driving factor
 factor = 'with_factors'
 pred_sequence = 'forward'
 
-epochs = 15
-model_n = 'No_seed_convLSTM_no_na_optuna'
+# epochs = 15
+# model_n = 'No_seed_convLSTM_no_na_random_search'
 
 # net = ConvLSTM(input_dim=input_channel,
 #                hidden_dim=[16, args.n_features], # hidden_dim = [32, 16, args.n_features]
@@ -161,71 +163,52 @@ model_n = 'No_seed_convLSTM_no_na_optuna'
 
 
 
-# new train function for optuna
-import optuna
 
-def train_convGRU(trial):
-    # try different sizes of the hidden layer
-    layer_sz = 2**trial.suggest_int("layer_sz", 2, 7) # value between 2^2 and 2^7
-    
-    
-    args = get_args()
-    # net = ConvLSTM(trial)
-    net = ConvLSTM(input_dim = input_channel,
-                   hidden_dim = [layer_sz, args.n_features], # hidden_dim = [32, 16, args.n_features]
-                   kernel_size = (3, 3), num_layers = 2, # num_layers=args.n_layer,
-                   batch_first = True, bias = bias_status, return_all_layers=False)
-    
-    net.to(device)
-    
-    print("GPU Usage after net configuration")
-    gpu_usage()
-    
-    # try different batch sizes
-    batch_size = trial.suggest_int('batch_size', 1, 8) # change to [1, 12]
-    
+def train_ConvGRU(config):
+    liveloss = PlotLosses()
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
-    train_dir = dataset_dir + "train/lulc_pred_6y_6c_no_na/"
+    train_dir = dataset_dir + "train/lulc_pred_6y_4c_no_na_norm/"
     train_data = MyDataset(imgs_dir = train_dir + 'input/',masks_dir = train_dir +'target/')
-    train_loader = DataLoader(dataset=train_data, batch_size = batch_size, shuffle=True, num_workers= 0)
-
-    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy"
+    train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
+    
+    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_4c_no_na_norm.npy"
     valid_input, gt = get_valid_dataset(ori_data_dir)
     
-    # try different learning rates
-    lr = trial.suggest_float("lr", 1e-5, 3e-2, log = True)
-    optimizer = optim.Adam(net.parameters(), lr, (0.9, 0.999)) # varying momentum?
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True) # varying lr?
+    # change to config here
+    net = ConvLSTM(input_dim = input_channel,
+                   hidden_dim=[config['l1'], 4], #args.n_features], # hidden_dim = [32, 16, args.n_features]
+                   kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
+                   batch_first=True, bias=bias_status, return_all_layers=False)
+    net.to(device)
+    
+    optimizer = optim.Adam(net.parameters(), lr = config['lr'], betas = (0.9, 0.999))
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True)
     criterion = nn.CrossEntropyLoss()
-    
-    print("GPU Usage before epochs")
-    gpu_usage() 
-    
-    net.apply(weight_init)
-    for epoch in range(0, epochs):
-        print("GPU Usage epoch", epoch)
-        gpu_usage()
 
+    net.apply(weight_init)
+    df = pd.DataFrame()
+    
+    for epoch in range(0, config["epochs"]):
         net.train()
         epoch_loss = 0
         acc = 0
         train_record = {'train_loss': 0, 'train_acc': 0}
 
         for i, (imgs, true_masks) in enumerate(train_loader):
-            imgs = imgs.to(device=device, dtype=torch.float32)
+            imgs = imgs.to(device=device, dtype=torch.float32) # (b, t, c, w, h)
             # imgs = min_max_scale(imgs) # added to scale all factors but the lc
-            # imgs = Variable(imgs)
+            imgs = Variable(imgs[:,0:4,:,:,:])
 
-            true_masks = Variable(true_masks.to(device=device, dtype=torch.long)) 
+            true_masks = Variable(true_masks[:,0:4,:,:].to(device=device, dtype=torch.long)) 
 
             # lulc classifer
-            output_list= net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
+            output_list = net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
             # output_list = net(imgs)
-            masks_pred = output_list[0]
-            _, masks_pred_max = torch.max(masks_pred.data, 2)
+            masks_pred = output_list[0] # (b, t, c, w, h)
+            _, masks_pred_max = torch.max(masks_pred.data, 2) # what is dim 2? the classes?? [4, 6, 7, 256, 256]
             loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), true_masks) # 4 years, (b, c, t, w, h)
 
-            epoch_loss += loss.item()
+            # epoch_loss += loss.item()
             optimizer.zero_grad() # set the gradients to zero
             loss.backward()
 
@@ -233,8 +216,8 @@ def train_convGRU(trial):
 
             # get acc
             # _, masks_pred_max = torch.max(masks_pred.data, 2)
-            pred_for_acc = masks_pred_max[:,-1,:,:]
-            true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:]
+            pred_for_acc = masks_pred_max[:,-1,:,:] # last year?
+            true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:] # last year?
 
             corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
             tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
@@ -245,71 +228,96 @@ def train_convGRU(trial):
             train_record['train_acc'] += batch_acc
 
             if i % 5 == 0:
-                print('Epoch [{} / {}], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,epochs,i+1,
+
+                print('Epoch [{} / 15], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,i+1,
                                                                                          loss.item(),batch_acc))
-            trial.report(train_record['train_acc'], epoch)
-            # handle pruning based on the intermediate value
-            if trial.should_prune():
-                raise optuna.exceptions.TrialPruned()
-            
+        
         train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
         train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
         
         print(train_record)
-
+        
         scheduler.step(batch_acc)
         # scheduler.step()
-        print("GPU Usage after epoch", epoch)
-        gpu_usage()
+        # ===================================== Validation ====================================#
+        with torch.no_grad():
+            net.eval()
+
+            val_record = {'val_kappa': 0, 'val_acc': 0, 'val_loss': 0}
+            #k, acc, QA = get_valid_record(valid_input, gt, net, factor_option=factor_option)
+            k, acc, ls = get_valid_record(valid_input, gt, net, factor_option='with_factors')
+
+            val_record['val_kappa'] = k
+            val_record['val_acc'] = acc
+            #val_record['val_QA'] = QA
+            val_record['val_loss'] = ls
+
+            print(val_record)
+         
+            liveloss.update({
+                'acc': train_record['train_acc'],
+                'val_acc': val_record['val_acc'],
+                'loss': train_record['train_loss'],
+                'val_loss': val_record['val_loss']
+                })
+            liveloss.send()   
+
+        print('---------------------------------------------------------------------------------------------------------')
+
+        if config["save_cp"]:
+            dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}/".format(config["model_n"], config["lr"], config["batch_size"])
+            os.makedirs(dir_checkpoint, exist_ok=True)
+            torch.save(net.state_dict(),
+                       dir_checkpoint + f'CP_epoch{epoch}.pth')
+            logging.info(f'Checkpoint {epoch} saved !')
         
-        del net # is this ok, or needed??
-        # delete all variables
-        todel = globals()
-        for i in todel:
-            del i
-        
-        return train_record['train_acc']
+        if config["save_csv"]:
+            train_record.update(val_record)
+            record_df = pd.DataFrame(train_record, index=[epoch])
+            df = df.append(record_df)
+            record_dir = proj_dir + 'data/record/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+            os.makedirs(record_dir, exist_ok=True)
+            df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
+
+
+
+
         
 print("usage before main")
 gpu_usage()
 
-if __name__ == "__main__":
-    study = optuna.create_study(direction='maximize')
-    study.optimize(train_convGRU, n_trials = 20, gc_after_trial=True)
-    
-    pruned_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
-    complete_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
-    
-    print('Study statistics: ')
-    print(' Nr of finished trials: ', len(study.trial))
-    print(' Nr of pruned trials: ', len(pruned_trials))
-    print(' Nr of complete trials: ', len(complete_trials))
-    
-    print('Best trial:')
-    trial = study.best_trial
-    
-    print(' Value: ', trial.value)
-    print(' Params: ')
-    for key, value in trial.params.items():
-        print(' {}: {}'.format(key,value))
 
 
-torch.cuda.empty_cache()
+# define random choice of hyperparameters
+config = {
+        "l1": 2 ** np.random.randint(2, 8),
+        "l2": 2 ** np.random.randint(2, 8),
+        "lr": np.random.uniform(0.01, 0.00001), # [0.1, 0.00001]
+        "batch_size": random.choice([2, 4, 6, 8, 12]),
+        "epochs": 15,
+        "model_n" : 'No_seed_convLSTM_4c_no_na_norm_random_search',
+        "save_cp" : True,
+        "save_csv" : True
+    }
 
 
-# import GPUtil
-# GPUs = GPUtil.getGPUs()
-# for i, gpu in enumerate(GPUs):
-#     print(i, gpu.memoryFree, gpu.memoryTotal, gpu.memoryUtil*100)
+
+print(config)
+
+# run with current set of random hyperparameters
+train_ConvGRU(config)
 
 
+
+dist = np.random.lognormal(0.1, 0.0001)
+dist
 # check cuda memory
-torch.cuda.current_device() 
-torch.cuda.get_device_name(0)
-torch.cuda.memory_allocated(0) 
-torch.cuda.memory_reserved(0)
-torch.cuda.memory_cached(0)
-torch.cuda.memory_cached(0)-torch.cuda.memory_allocated(0)
+# torch.cuda.current_device() 
+# torch.cuda.get_device_name(0)
+# torch.cuda.memory_allocated(0) 
+# torch.cuda.memory_reserved(0)
+# torch.cuda.memory_cached(0)
+# torch.cuda.memory_cached(0)-torch.cuda.memory_allocated(0)
 
 
 
