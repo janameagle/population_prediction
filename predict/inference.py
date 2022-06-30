@@ -58,22 +58,29 @@ def pre_prcessing(crop_img):
     oh_crop_img = np.concatenate((oh_crop_img_lulc, crop_img[:, 1:, :, :]), axis=1)
     return oh_crop_img
 
+# def color_annotation(image):
+#     color = np.ones([image.shape[0], image.shape[1], 3])
+#     color[image == 0] = [0, 102, 0]  # shrub
+#     color[image == 1] = [0, 255, 255]  # savanna
+#     color[image == 2] = [0, 204, 0]  # grassland
+#     color[image == 3] = [0, 128, 255]  # croplands
+#     color[image == 4] = [0, 0, 255]  # urban
+#     color[image == 5] = [128, 128, 128]  # barren
+#     color[image == 6] = [255, 128, 0]  # water
+#     return color
+
 def color_annotation(image):
     color = np.ones([image.shape[0], image.shape[1], 3])
-    color[image == 0] = [0, 102, 0]  # shrub
-    color[image == 1] = [0, 255, 255]  # savanna
-    color[image == 2] = [0, 204, 0]  # grassland
-    color[image == 3] = [0, 128, 255]  # croplands
-    color[image == 4] = [0, 0, 255]  # urban
-    color[image == 5] = [128, 128, 128]  # barren
-    color[image == 6] = [255, 128, 0]  # water
+    color[image == 0] = [0, 102, 0]  # vegetation
+    color[image == 1] =  [0, 0, 255]  # urban
+    color[image == 2] = [128, 128, 128]  # barren
+    color[image == 3] = [255, 128, 0]  # water
     return color
-
 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train ConvLSTM Models', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-f', '--n_features', default=7, type=int, dest='n_features')
+    parser.add_argument('-f', '--n_features', default=4, type=int, dest='n_features')
     parser.add_argument('-s', '--filter_size', default=5, type=int, dest='filter_size')
     parser.add_argument('-b', '--batch_size', default=1, type=int, nargs='?', help='Batch size', dest='batch_size')
     parser.add_argument('-c', '--input_channel', default=15, type=int, dest='input_channel') # [7, 15]
@@ -84,14 +91,14 @@ def get_args():
 
 
 if __name__ == '__main__':
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cpu'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = 'cpu'
     os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     args = get_args()
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na_norm.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     # scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
@@ -109,7 +116,7 @@ if __name__ == '__main__':
     valid_record = {'kappa': 0, 'acc': 0}
 
     #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
-    dir_checkpoint = proj_dir + "data/ckpts/forward/No_seed_convLSTM_no_na_lr003_layer2/with_factors/CP_epoch24.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/No_seed_convLSTM_no_na_4c_norm/lr0.00163_bs12/CP_epoch14.pth"
 
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
@@ -129,8 +136,8 @@ if __name__ == '__main__':
             # test_img = min_max_scale(test_img) # added to scale all factors but the lc
 
             net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[16, args.n_features],
-                          kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
+                          hidden_dim=[4, 4, args.n_features],
+                          kernel_size=(3, 3), num_layers= 3 , # num_layers= args.n_layer,
                           batch_first=True, bias=bias_status, return_all_layers=False)
 
             net.to(device)
@@ -139,7 +146,7 @@ if __name__ == '__main__':
 
             output_list = net(test_img[:,:,1:,::]) # 1: for all factors but lc
 
-            masks_pred = output_list[0].view(args.seq_len, args.n_features, 256, 256)
+            masks_pred = output_list[0].view(args.seq_len, args.n_features, 256, 256) # t, c, w, h
             pred_prob = torch.softmax(torch.squeeze(masks_pred),dim=1).data.cpu().numpy()
             pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:,:,:])
             pred_img_list.append(pred_img)
@@ -160,7 +167,7 @@ if __name__ == '__main__':
     print('kappa: ', k, 'acc: ', acc)
 
 
-    save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_lr003_layer2/'#.format(pred_seq, model_n,factor_option)
+    save_path = proj_dir + 'data/test/No_seed_convLSTM_no_na_4c_norm/lr0.00163_bs12/'#.format(pred_seq, model_n,factor_option)
 
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)

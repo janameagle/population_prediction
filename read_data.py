@@ -5,8 +5,8 @@ Created on Mon May 30 13:39:02 2022
 @author: jmaie
 """
 # data_dir = "H:/Masterarbeit/Code/population_prediction/"
-# proj_dir = "H:/Masterarbeit/population_prediction/"
-proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+proj_dir = "H:/Masterarbeit/population_prediction/"
+# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
 
@@ -46,9 +46,9 @@ def min_max_scale(img): # (t,c,w,h)
     # device = 'cpu'
     scaler = MinMaxScaler(feature_range=(0, 1))
     data_new = np.zeros(img.shape)
-    data_new[:,0,:,:] = img[:,0,:,:]
+    data_new[:,0,:,:] = img[:,0,:,:] # lc not to be normalized
 
-    for i in range(1,img.shape[1]):
+    for i in range(1, img.shape[1]): # for each feature except lc
         temp = img[:,i,:,:].reshape(-1,1)
         scaler.fit(temp)
         new_data = scaler.transform(temp)
@@ -94,8 +94,8 @@ def min_max_scale(img): # (t,c,w,h)
 
 
 # loop over years and stack all the data to retreive an array [20,7,888,888]:
-# seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
-seq = ['01', '04', '08', '12', '16', '20']
+seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
+# seq = ['01', '04', '08', '12', '16', '20']
 dat_multitemp = np.zeros((6,7,888,888))
 
 i=0
@@ -140,7 +140,10 @@ np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy', lc_
 
 
 # slice the input data image
-full_image = lcnew_multitemp
+full_image = np.load(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na.npy')
+# full_image = lcnew_multitemp
+full_image = min_max_scale(full_image)
+np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na_norm.npy', full_image)
 h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]
 img_size = 256 # how big the tiles should be
@@ -170,8 +173,8 @@ print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na_norm/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na_norm/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_4c_no_na_norm/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_4c_no_na_norm/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
 
 
 
