@@ -100,7 +100,7 @@ dat_multitemp = np.zeros((6,7,888,888))
 
 i=0
 for y in seq:
-   im = io.imread(proj_dir + 'data/yearly/brick_20' + y + '.tif')
+   im = io.imread(proj_dir + 'data/yearly_no_na/brick_20' + y + '.tif')
    im_move = np.moveaxis(im, 2, 0)
    dat_multitemp[i,:,:,:] = im_move
    i += 1
@@ -122,12 +122,12 @@ plt.imshow(lc_multitemp[1,0,:,:])
 # assign new class values
 lcnew_multitemp = lc_multitemp
 lcnew_multitemp[lc_multitemp == 7] = 0 # shrub
-lcnew_multitemp[lc_multitemp == 9] = 1 # savanna
-lcnew_multitemp[lc_multitemp == 10] = 2 # grassland
-lcnew_multitemp[lc_multitemp == 12] = 3 # croplands
-lcnew_multitemp[lc_multitemp == 13] = 4 # urban
-lcnew_multitemp[lc_multitemp == 16] = 5 # barren
-lcnew_multitemp[lc_multitemp == 17] = 6 # water
+lcnew_multitemp[lc_multitemp == 9] = 0 # savanna
+lcnew_multitemp[lc_multitemp == 10] = 0 # grassland
+lcnew_multitemp[lc_multitemp == 12] = 0 # croplands
+lcnew_multitemp[lc_multitemp == 13] = 1 # urban
+lcnew_multitemp[lc_multitemp == 16] = 2 # barren
+lcnew_multitemp[lc_multitemp == 17] = 3 # water
 np.unique(lcnew_multitemp[:, 0, :, :])
 
 
@@ -135,7 +135,7 @@ np.unique(lcnew_multitemp[:, 0, :, :])
 # normalize values
 # lc_multitemp = min_max_scale(lc_multitemp)
 # save stacked multitemporal image as numpy data
-np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_6c_no_na_norm.npy', lc_multitemp)
+np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na.npy', lc_multitemp)
 
 
 
@@ -170,14 +170,16 @@ print(sub_img_list[1].shape)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na_norm/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
-    np.save(proj_dir + 'data/train/lulc_pred_6y_6c_no_na_norm/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
+    np.save(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
 
 
 
+# inp = np.load(proj_dir + 'data/18_input.npy')
+# targ = np.load(proj_dir + 'data/18_target.npy')
 
-
-
+# inp1 = np.load(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/input/20_input.npy')
+# targ1 = np.load(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/target/20_target.npy')
 
 
 
