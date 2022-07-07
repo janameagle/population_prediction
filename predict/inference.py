@@ -80,15 +80,17 @@ def color_annotation(image):
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train ConvLSTM Models', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-epoch', '--epoch', default=15, type=int, dest='epoch')
+    parser.add_argument('-lr', '--learn_rate', default=8e-4, type=float, dest='learn_rate')
     parser.add_argument('-f', '--n_features', default=4, type=int, dest='n_features')
-    parser.add_argument('-s', '--filter_size', default=5, type=int, dest='filter_size')
-    parser.add_argument('-b', '--batch_size', default=1, type=int, nargs='?', help='Batch size', dest='batch_size')
-    parser.add_argument('-c', '--input_channel', default=15, type=int, dest='input_channel') # [7, 15]
+    parser.add_argument('-b', '--batch_size', default=12, type=int, nargs='?', help='Batch size', dest='batch_size') #5
     parser.add_argument('-n', '--n_layer', default=3, type=int, dest='n_layer')
     parser.add_argument('-l', '--seq_len', default=4, type=int, dest='seq_len')
     parser.add_argument('-is', '--input_shape', default=(256, 256), type=tuple, dest='input_shape')
     return parser.parse_args()
 
+n_years = 6
+n_classes = 4
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -98,7 +100,7 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na_norm.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     # scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
@@ -106,17 +108,17 @@ if __name__ == '__main__':
     #                                               recompute_scale_factor=True)
     # processed_ori_data = scaled_data.numpy()
     processed_ori_data = ori_data
-    valid_input = processed_ori_data[1:5, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
+    valid_input = processed_ori_data[-5:-1, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
     gt = processed_ori_data[-1, 0, :, :] # last year, land cover
     print('valid_sequence shape: ', valid_input.shape)
 
-    input_channel = 6 # 19
+    input_channel = 10 # 19
 
     df = pd.DataFrame()
     valid_record = {'kappa': 0, 'acc': 0}
 
     #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
-    dir_checkpoint = proj_dir + "data/ckpts/No_seed_convLSTM_no_na_4c_norm/lr0.00163_bs12/CP_epoch14.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/No_seed_convLSTM_20y_4c_no_na_oh_norm_random_search_15-20/lr0.009581606884006175_bs4/CP_epoch14.pth"
 
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
@@ -136,15 +138,15 @@ if __name__ == '__main__':
             # test_img = min_max_scale(test_img) # added to scale all factors but the lc
 
             net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[4, 4, args.n_features],
-                          kernel_size=(3, 3), num_layers= 3 , # num_layers= args.n_layer,
+                          hidden_dim=[16, args.n_features],
+                          kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
                           batch_first=True, bias=bias_status, return_all_layers=False)
 
             net.to(device)
             net.load_state_dict(torch.load(dir_checkpoint))
             # net.eval() # added from Pytorch tutorial
 
-            output_list = net(test_img[:,:,1:,::]) # 1: for all factors but lc
+            output_list = net(test_img[:,:,1:,:,:]) # 1: for all factors but lc
 
             masks_pred = output_list[0].view(args.seq_len, args.n_features, 256, 256) # t, c, w, h
             pred_prob = torch.softmax(torch.squeeze(masks_pred),dim=1).data.cpu().numpy()
@@ -167,7 +169,7 @@ if __name__ == '__main__':
     print('kappa: ', k, 'acc: ', acc)
 
 
-    save_path = proj_dir + 'data/test/No_seed_convLSTM_no_na_4c_norm/lr0.00163_bs12/'#.format(pred_seq, model_n,factor_option)
+    save_path = proj_dir + 'data/test/No_seed_convLSTM_20y_4c_no_na_oh_norm_random_search_15-20/lr0.009581606884006175_bs4/'#.format(pred_seq, model_n,factor_option)
 
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)

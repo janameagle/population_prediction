@@ -37,13 +37,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = 'cpu'
 
 def pre_prcessing(crop_img): # why?
-    crop_img_lulc = torch.from_numpy(crop_img[:, 0, :, :]) # was not converted to torch before, select lc
+    crop_img_lulc = crop_img[:,:,0,:,:] # torch.from_numpy(crop_img[:, 0, :, :]) # was not converted to torch before, select lc
     temp_list = []
     for j in range(crop_img_lulc.shape[0]): # for each year?
-        temp = oh_code(crop_img_lulc[j], class_n=7) # array of binary mask per class
+        temp = oh_code(crop_img_lulc[j], class_n=4) # array of binary mask per class
         temp_list.append(temp[np.newaxis, :, :, :]) # store class masks per year in list
     oh_crop_img_lulc = np.concatenate(temp_list, axis=0)
-    oh_crop_img = np.concatenate((oh_crop_img_lulc, crop_img[:, 1:, :, :]), axis=1)
+    oh_crop_img = np.concatenate((crop_img[:,:,0,:,:], oh_crop_img_lulc, crop_img[:, 1:, :, :]), axis=1)
     return oh_crop_img
 
 def evaluate(pred, gt):
@@ -71,7 +71,7 @@ def get_subsample_centroids(img, img_size=50):
             new_y_list.append(int(j))
     return new_x_list, new_y_list
 
-def oh_code(a, class_n = 7):
+def oh_code(a, class_n = 4):
     oh_list = []
     for i in range(class_n): # for each class
         temp = torch.where(a == i, 1, 0) # binary mask per class
@@ -84,7 +84,7 @@ def get_valid_dataset(ori_data_dir):
                                                   scale_factor=(1 / 3, 1 / 3),
                                                   recompute_scale_factor=True)
     processed_ori_data = scaled_data.numpy()
-    valid_input = processed_ori_data[1:-1, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
+    valid_input = processed_ori_data[1:19, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
     gt = processed_ori_data[-1, 0, :, :] # last year, land cover
     return valid_input, gt
 
@@ -98,7 +98,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
     pred_img_list = []
     with torch.no_grad():
         for test_img in sub_img_list:
-            # test_img = pre_prcessing(test_img)
+            test_img = pre_prcessing(test_img)
             # test_imag = Variable(...)
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
@@ -142,7 +142,7 @@ args = get_args()
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
 
-input_channel = 12                                            # 19 driving factors
+input_channel = 11                                            # 19 driving factors
 factor = 'with_factors'
 pred_sequence = 'forward'
 
@@ -166,16 +166,16 @@ pred_sequence = 'forward'
 def train_ConvGRU(config):
     liveloss = PlotLosses()
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
-    train_dir = dataset_dir + "train/lulc_pred_6y_6c_no_na_oh_norm/"
+    train_dir = dataset_dir + "train/lulc_pred_20y_4c_no_na_norm/"
     train_data = MyDataset(imgs_dir = train_dir + 'input/',masks_dir = train_dir +'target/')
     train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
     
-    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_6y_6c_no_na_oh_norm.npy"
+    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_20y_4c_no_na_norm.npy"
     valid_input, gt = get_valid_dataset(ori_data_dir)
     
     # change to config here
     net = ConvLSTM(input_dim = input_channel,
-                   hidden_dim=[config['l1'], config['l2'], 7], # hidden_dim = [32, 16, args.n_features]
+                   hidden_dim=[config['l1'], config['l2'], 4], # hidden_dim = [32, 16, args.n_features]
                    kernel_size=(3, 3), num_layers = 3, # num_layers=args.n_layer,
                    batch_first=True, bias=bias_status, return_all_layers=False)
     net.to(device)
@@ -189,19 +189,20 @@ def train_ConvGRU(config):
     
     for epoch in range(0, config["epochs"]):
         net.train()
-        # epoch_loss = 0
+        epoch_loss = 0
         acc = 0
         train_record = {'train_loss': 0, 'train_acc': 0}
 
         for i, (imgs, true_masks) in enumerate(train_loader):
+            imgs = torch.from_numpy(pre_prcessing(imgs))
             imgs = imgs.to(device=device, dtype=torch.float32)
             # imgs = min_max_scale(imgs) # added to scale all factors but the lc
-            imgs = Variable(imgs[:,0:-2,:,:,:])
+            imgs = Variable(imgs[:,0:18,:,:,:])
 
-            true_masks = Variable(true_masks[:,0:-2,:,:].to(device=device, dtype=torch.long)) 
+            true_masks = Variable(true_masks[:,0:18,:,:].to(device=device, dtype=torch.long)) 
 
             # lulc classifer
-            output_list = net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 18 years
+            output_list = net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
             # output_list = net(imgs)
             masks_pred = output_list[0]
             _, masks_pred_max = torch.max(masks_pred.data, 2) # what is dim 2? the classes?? [4, 6, 7, 256, 256]
@@ -294,7 +295,7 @@ config = {
         "lr": 0.00163, # np.random.uniform(0.1, 0.00001), # [0.1, 0.00001]
         "batch_size": 8, #random.choice([2, 4, 6, 8, 12]),
         "epochs": 15,
-        "model_n" : 'No_seed_convLSTM_no_na_6y_6c_norm',
+        "model_n" : 'No_seed_convLSTM_no_na_20y_4c_norm',
         "save_cp" : True,
         "save_csv" : True
     }

@@ -39,6 +39,7 @@ import numpy as np
 from skimage import io
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
+import os
 # import torch
 
 
@@ -96,7 +97,9 @@ def min_max_scale(img): # (t,c,w,h)
 # loop over years and stack all the data to retreive an array [20,7,888,888]:
 seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
 # seq = ['01', '04', '08', '12', '16', '20']
-dat_multitemp = np.zeros((6,7,888,888))
+n_years = 20
+n_classes = 7
+dat_multitemp = np.zeros((n_years,7,888,888))
 
 i=0
 for y in seq:
@@ -111,7 +114,7 @@ print(dat_multitemp)
 plt.imshow(dat_multitemp[1,2,:,:]) 
 
 # put lc on first place in second axis, for lulc prediction model
-lc_multitemp = np.zeros((6,7,888,888))
+lc_multitemp = np.zeros((n_years,7,888,888))
 lc_multitemp[:,0,:,:] = dat_multitemp[:,2,:,:]
 lc_multitemp[:,1:3,:,:] = dat_multitemp[:,0:2,:,:]
 lc_multitemp[:,3:7,:,:] = dat_multitemp[:,3:7,:,:]
@@ -122,28 +125,51 @@ plt.imshow(lc_multitemp[1,0,:,:])
 # assign new class values
 lcnew_multitemp = lc_multitemp
 lcnew_multitemp[lc_multitemp == 7] = 0 # shrub
-lcnew_multitemp[lc_multitemp == 9] = 0 # savanna
-lcnew_multitemp[lc_multitemp == 10] = 0 # grassland
-lcnew_multitemp[lc_multitemp == 12] = 0 # croplands
-lcnew_multitemp[lc_multitemp == 13] = 1 # urban
-lcnew_multitemp[lc_multitemp == 16] = 2 # barren
-lcnew_multitemp[lc_multitemp == 17] = 3 # water
+lcnew_multitemp[lc_multitemp == 9] = 1 # savanna
+lcnew_multitemp[lc_multitemp == 10] = 2 # grassland
+lcnew_multitemp[lc_multitemp == 12] = 3 # croplands
+lcnew_multitemp[lc_multitemp == 13] = 4 # urban
+lcnew_multitemp[lc_multitemp == 16] = 5 # barren
+lcnew_multitemp[lc_multitemp == 17] = 6 # water
 np.unique(lcnew_multitemp[:, 0, :, :])
+
+
+
+# add class masks as input factors
+import torch
+def oh_code(a, class_n = n_classes):
+    oh_list = []
+    for i in range(class_n): # for each class
+        temp = torch.where(a == i, 1, 0) # binary mask per class
+        oh_list.append(temp) # store each class mask as list entry
+    return torch.stack(oh_list,0) #torch.stack(oh_list,1) # return array, not list
+
+
+crop_img_lulc = torch.from_numpy(lcnew_multitemp[:, 0, :, :]) # was not converted to torch before, select lc
+temp_list = []
+for j in range(crop_img_lulc.shape[0]): # for each year?
+    temp = oh_code(crop_img_lulc[j], class_n=n_classes) # array of binary mask per class
+    temp_list.append(temp[np.newaxis, :, :, :]) # store class masks per year in list
+oh_crop_img_lulc = np.concatenate(temp_list, axis=0)
+oh_crop_img = np.concatenate((crop_img_lulc[:,np.newaxis,:,:], oh_crop_img_lulc, lcnew_multitemp[:, 1:, :, :]), axis=1)
+
+
+
 
 
 
 # normalize values
 # lc_multitemp = min_max_scale(lc_multitemp)
 # save stacked multitemporal image as numpy data
-np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na.npy', lc_multitemp)
+np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh.npy', oh_crop_img)
 
 
 
 # slice the input data image
-full_image = np.load(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na.npy')
+full_image = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh.npy')
 # full_image = lcnew_multitemp
 full_image = min_max_scale(full_image)
-np.save(proj_dir + 'data/ori_data/lulc_pred/input_all_6y_4c_no_na_norm.npy', full_image)
+np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm.npy', full_image)
 h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]
 img_size = 256 # how big the tiles should be
@@ -171,12 +197,15 @@ for x, y in zip(new_x_list, new_y_list):
 print(len(sub_img_list))
 print(sub_img_list[1].shape)
 
+dir_input = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm/input/'
+dir_target = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm/target/'
+os.makedirs(dir_input, exist_ok=True)
+os.makedirs(dir_target, exist_ok=True)
+
 # save all sub images separately
 for i in range(len(sub_img_list)):
-
-    np.save(proj_dir + 'data/train/lulc_pred_6y_4c_no_na_norm/input/'+ str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
-    np.save(proj_dir + 'data/train/lulc_pred_6y_4c_no_na_norm/target/'+ str(i) + '_target.npy', sub_img_list[i][:,0,:,:])
-
+    np.save(dir_input + str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
+    np.save(dir_target + str(i) + '_target.npy', sub_img_list[i][:,1,:,:])
 
 
 
@@ -185,8 +214,6 @@ for i in range(len(sub_img_list)):
 
 # inp1 = np.load(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/input/20_input.npy')
 # targ1 = np.load(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/target/20_target.npy')
-
-
 
 
 
