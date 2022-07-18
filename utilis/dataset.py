@@ -3,15 +3,22 @@ import torch
 from torch.utils.data import Dataset
 import os
 from sklearn.preprocessing import MinMaxScaler
+import torchvision.transforms as transforms
+
+
+train_transform = transforms.Compose([
+    transforms.RandomRotation(degrees = 180, interpolation = 'nearest'),
+    transforms.ToTensor()
+])
 
 
 class MyDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, augment = False):                  
+    def __init__(self, imgs_dir, masks_dir, transform = train_transform):                  
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.ids = [os.path.join(imgs_dir, x) for x in os.listdir(imgs_dir)]   # direction of images
         self.msk_ids = [os.path.join(masks_dir, x) for x in os.listdir(masks_dir)]
-        self.aug = augment
+        self.transf = transform
 
     def __len__(self): # number of images
         return len(self.ids)
@@ -20,20 +27,22 @@ class MyDataset(Dataset):
         img = np.load(self.ids[index])
         mask = np.load(self.msk_ids[index])
 
-        if self.aug == True: # create random augmentation -> random subimage
-            img_size = img.shape[-1] # width or height
-            crop_size = 25
-            w_random = np.random.randint(img_size - crop_size) # one random nr, why imgs-crops?
-            h_random = np.random.randint(img_size - crop_size)
-            img = img[:, :, w_random:w_random + crop_size, h_random:h_random + crop_size] # why + crop size?
-            mask = mask[:, w_random:w_random + crop_size, h_random:h_random + crop_size]
-        else:
-            img_size = img.shape[-1]
-            crop_size = 256
-            w = (img_size - crop_size) // 2
-            h = (img_size - crop_size) // 2
-            img = img[:, :, w:w + crop_size, h:h + crop_size]
-            mask = mask[:, w:w + crop_size, h:h + crop_size]
+        if self.transf is not None: # create random augmentation -> random subimage
+            img = self.transform(img)
+
+        #     img_size = img.shape[-1] # width or height
+        #     crop_size = 25
+        #     w_random = np.random.randint(img_size - crop_size) # one random nr, why imgs-crops?
+        #     h_random = np.random.randint(img_size - crop_size)
+        #     img = img[:, :, w_random:w_random + crop_size, h_random:h_random + crop_size] # why + crop size?
+        #     mask = mask[:, w_random:w_random + crop_size, h_random:h_random + crop_size]
+        # else:
+        #     img_size = img.shape[-1]
+        #     crop_size = 256
+        #     w = (img_size - crop_size) // 2
+        #     h = (img_size - crop_size) // 2
+        #     img = img[:, :, w:w + crop_size, h:h + crop_size]
+        #     mask = mask[:, w:w + crop_size, h:h + crop_size]
 
         img = torch.from_numpy(img.copy()) # creates tensor from numpy array
         mask = torch.from_numpy(mask.copy())
