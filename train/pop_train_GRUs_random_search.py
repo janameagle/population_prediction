@@ -131,7 +131,21 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
     return k, acc, loss.item()
 
 
+class EarlyStopping():
+    def __init__(self, tolerance=5, min_delta=0):
 
+        self.tolerance = tolerance
+        self.min_delta = min_delta
+        self.counter = 0
+        self.early_stop = False
+
+    def __call__(self, train_loss, validation_loss):
+        if (validation_loss - train_loss) > self.min_delta:
+            self.counter +=1
+            if self.counter >= self.tolerance:  
+                self.early_stop = True
+                
+early_stopping = EarlyStopping(tolerance=5, min_delta=10)               
 
 # from train_all script
 #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -188,6 +202,8 @@ def train_ConvGRU(config):
     net.apply(weight_init)
     df = pd.DataFrame()
     
+    
+    
     for epoch in range(0, config["epochs"]):
         net.train()
         # epoch_loss = 0
@@ -231,6 +247,8 @@ def train_ConvGRU(config):
 
                 print('Epoch [{} / 15], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,i+1,
                                                                                          loss.item(),batch_acc))
+            
+        
         
         train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
         train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
@@ -280,6 +298,11 @@ def train_ConvGRU(config):
             df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
 
 
+        # Early stopping
+        early_stopping(train_record['train_loss'], val_record['val_loss'])
+        if early_stopping.early_stop:
+            print("We are at epoch:", epoch)
+            break
 
 
         
