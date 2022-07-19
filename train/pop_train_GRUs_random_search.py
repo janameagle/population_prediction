@@ -305,10 +305,10 @@ def train_ConvGRU(config):
 
 
         # Early stopping
-        # early_stopping(train_record['train_loss'], val_record['val_loss'])
-        # if early_stopping.early_stop:
-        #     print("We are at epoch:", epoch)
-        #     break
+        early_stopping(train_record['train_loss'], val_record['val_loss'])
+        if early_stopping.early_stop:
+            print("We are at epoch:", epoch)
+            break
 
 
         
