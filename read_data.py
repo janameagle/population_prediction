@@ -43,7 +43,7 @@ import os
 # import torch
 
 
-def min_max_scale(img): # (t,c,w,h)
+def min_max_scale(img): # (t,c,w,h); channels: lc, pop, urb_dist, slope, streets_dist, water_dist, center_dist, class0mask, class1mask, class2mask, class3mask
     # device = 'cpu'
     scaler = MinMaxScaler(feature_range=(0, 1))
     data_new = np.zeros(img.shape)
@@ -95,10 +95,11 @@ def min_max_scale(img): # (t,c,w,h)
 
 
 # loop over years and stack all the data to retreive an array [20,7,888,888]:
-seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
+# seq = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
 # seq = ['01', '04', '08', '12', '16', '20']
-n_years = 20
-n_classes = 7
+seq = ['15', '16', '17', '18', '19', '20']
+n_years = 6
+n_classes = 4
 dat_multitemp = np.zeros((n_years,7,888,888))
 
 i=0
@@ -125,13 +126,13 @@ plt.imshow(lc_multitemp[1,0,:,:])
 # assign new class values
 lcnew_multitemp = lc_multitemp
 lcnew_multitemp[lc_multitemp == 7] = 0 # shrub
-lcnew_multitemp[lc_multitemp == 9] = 1 # savanna
-lcnew_multitemp[lc_multitemp == 10] = 2 # grassland
-lcnew_multitemp[lc_multitemp == 12] = 3 # croplands
-lcnew_multitemp[lc_multitemp == 13] = 4 # urban
-lcnew_multitemp[lc_multitemp == 16] = 5 # barren
-lcnew_multitemp[lc_multitemp == 17] = 6 # water
-np.unique(lcnew_multitemp[:, 0, :, :])
+lcnew_multitemp[lc_multitemp == 9] = 0 # savanna
+lcnew_multitemp[lc_multitemp == 10] = 0 # grassland
+lcnew_multitemp[lc_multitemp == 12] = 0 # croplands
+lcnew_multitemp[lc_multitemp == 13] = 1 # urban
+lcnew_multitemp[lc_multitemp == 16] = 2 # barren
+lcnew_multitemp[lc_multitemp == 17] = 3 # water
+np.unique(lcnew_multitemp[:, 0, :, :]) # shape: (t, c, w, h)
 
 
 
@@ -151,8 +152,9 @@ for j in range(crop_img_lulc.shape[0]): # for each year?
     temp = oh_code(crop_img_lulc[j], class_n=n_classes) # array of binary mask per class
     temp_list.append(temp[np.newaxis, :, :, :]) # store class masks per year in list
 oh_crop_img_lulc = np.concatenate(temp_list, axis=0)
-oh_crop_img = np.concatenate((crop_img_lulc[:,np.newaxis,:,:], oh_crop_img_lulc, lcnew_multitemp[:, 1:, :, :]), axis=1)
-
+oh_crop_img = np.concatenate((crop_img_lulc[:,np.newaxis,:,:], lcnew_multitemp[:, 1:, :, :], oh_crop_img_lulc), axis=1)
+# oh_crop_img with lc, pop, urb_dist, slope, streets_dist, water_dist, center_dist, class0mask, class1mask, class2mask, class3mask
+oh_crop_img = np.float32(oh_crop_img) # for smaller storage size
 
 
 
@@ -169,7 +171,9 @@ np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + st
 full_image = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh.npy')
 # full_image = lcnew_multitemp
 full_image = min_max_scale(full_image)
-np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm.npy', full_image)
+# pop_unnormed = full_image[:,1,:,:]
+# full_image = np.concatenate((pop_unnormed[:,np.newaxis,:,:], full_image_norm), axis = 1) # t, c, w, h. Channels: pop unnormed, lc unnormed, pop normed, ...
+np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm.npy', full_image) # lc unnormed, pop normed, ...
 h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]
 img_size = 256 # how big the tiles should be
@@ -192,7 +196,7 @@ sub_img_list = []
 
 for x, y in zip(new_x_list, new_y_list):
     sub_img = full_image[:, :, x - 128:x + 128, y - 128:y + 128] # get subimage around centroid
-    sub_img_list.append(sub_img)    
+    sub_img_list.append(np.float32(sub_img))    
     
 print(len(sub_img_list))
 print(sub_img_list[1].shape)
@@ -204,8 +208,8 @@ os.makedirs(dir_target, exist_ok=True)
 
 # save all sub images separately
 for i in range(len(sub_img_list)):
-    np.save(dir_input + str(i) + '_input.npy', sub_img_list[i][:,:,:,:])
-    np.save(dir_target + str(i) + '_target.npy', sub_img_list[i][:,1,:,:])
+    np.save(dir_input + str(i) + '_input.npy', sub_img_list[i][-6:,1:,:,:]) # all except lc not normed
+    np.save(dir_target + str(i) + '_target.npy', sub_img_list[i][-6:,1,:,:]) # pop normed
 
 
 

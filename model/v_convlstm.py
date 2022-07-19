@@ -28,7 +28,7 @@ class ConvLSTMCell(nn.Module):
         self.bias = bias
 
         self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
-                              out_channels=4 * self.hidden_dim,
+                              out_channels=4 * self.hidden_dim, # why 4? because 4 are needed for LSTM? i, f, o, g? Or 4 time steps?
                               kernel_size=self.kernel_size,
                               padding=self.padding,
                               bias=self.bias)
@@ -144,13 +144,13 @@ class ConvLSTM(nn.Module):
         seq_len = input_tensor.size(1) # t, number of years
         cur_layer_input = input_tensor
 
-        for layer_idx in range(self.num_layers):
+        for layer_idx in range(self.num_layers): # loop over layers
 
-            h, c = hidden_state[layer_idx]
+            h, c = hidden_state[layer_idx] # images with several channels
             output_inner = []
-            for t in range(seq_len):
+            for t in range(seq_len): # loop over time steps
                 h, c = self.cell_list[layer_idx](input_tensor=cur_layer_input[:, t, :, :, :],
-                                                 cur_state=[h, c])
+                                                 cur_state=[h, c])   # cell_list ist a list of 1 convlstm for every layer
                 output_inner.append(h)
 
 

@@ -26,6 +26,7 @@ import numpy as np
 from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 from GPUtil import showUtilization as gpu_usage
 import random
+import matplotlib.pyplot as plt
 
 
 print("initial usage")
@@ -81,11 +82,12 @@ def get_subsample_centroids(img, img_size=50):
 
 def get_valid_dataset(ori_data_dir):
     ori_data = np.load(ori_data_dir)#.transpose((1, 0, 2, 3))
-    scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
-                                                  scale_factor=(1 / 3, 1 / 3),
-                                                  recompute_scale_factor=True)
-    processed_ori_data = scaled_data.numpy()
-    valid_input = processed_ori_data[-5:-1, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
+    # scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
+    #                                               scale_factor=(1 / 3, 1 / 3),
+    #                                               recompute_scale_factor=True)
+    # processed_ori_data = scaled_data.numpy()
+    processed_ori_data = ori_data
+    valid_input = processed_ori_data[-5:-1, :, :, :] # years 2016 - 2019
     gt = processed_ori_data[-1, 1, :, :] # last year, pop
     return valid_input, gt
 
@@ -105,18 +107,25 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
                                                                                    dtype=torch.float32)
 
             output_list = net(test_img[:, :, 1:, :, :]) # all except lc
-            masks_pred = output_list[0]
-            pred_prob = torch.softmax(torch.squeeze(masks_pred), dim=1).data.cpu().numpy()
+            masks_pred = output_list[0].squeeze()
+            # lin = nn.Linear(1,1)
+            # pred = lin(masks_pred.permute(0,1,3,4,2)).permute(0,1,4,2,3)
+            # pred.to(device)
+
+            # pred_img = pred.squeeze()
+            pred_img = masks_pred
+            criterion = nn.MSELoss() # no crossentropyloss for regression
+            loss = criterion(pred_img.float(), test_img[:,:,1,:,:].squeeze().float()) # for validation loss
+           
+
             
-            criterion = nn.CrossEntropyLoss() # for validation loss
-            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), test_img[:,:,0,:,:].long()) # for validation loss
             
-            
-            pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:, :, :])
-            pred_img_list.append(pred_img)
+            # pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:, :, :])
+            pred_img_list.append(pred_img[-1,:,:].cpu().numpy())
     pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
 
     h = 0
+
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
     for x, y in zip(x_list, y_list):
         if x == np.min(x_list) or x == np.max(x_list) or y == np.min(y_list) or y == np.max(y_list):
@@ -163,16 +172,16 @@ pred_sequence = 'forward'
 
 
 
-
 def train_ConvGRU(config):
     liveloss = PlotLosses()
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
-    train_dir = dataset_dir + "train/lulc_pred_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm/"
+    train_dir = dataset_dir + "train/pop_pred_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm/"
     train_data = MyDataset(imgs_dir = train_dir + 'input/',masks_dir = train_dir +'target/')
     train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
     
-    ori_data_dir = proj_dir + "data/ori_data/lulc_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm.npy"
+    ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm.npy"
     valid_input, gt = get_valid_dataset(ori_data_dir)
+    # valid_input = valid_input[:,2:,:,:] # no pop unnormed, no lc unnormed
     
     # change to config here
     net = ConvLSTM(input_dim = input_channel,
@@ -183,7 +192,7 @@ def train_ConvGRU(config):
     
     optimizer = optim.Adam(net.parameters(), lr = config['lr'], betas = (0.9, 0.999))
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.8, patience=10, verbose=True)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss() # no crossentropyloss for regression
 
     net.apply(weight_init)
     df = pd.DataFrame()
@@ -197,16 +206,22 @@ def train_ConvGRU(config):
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32) # (b, t, c, w, h)
             # imgs = min_max_scale(imgs) # added to scale all factors but the lc
-            imgs = Variable(imgs[:,-6:-2,:,:,:])
+            imgs = Variable(imgs[:,-6:-2,:,:,:]) # 2015 - 2018
 
-            true_masks = Variable(true_masks[:,-6:-2,:,:].to(device=device, dtype=torch.long)) 
+            true_masks = true_masks[:,-6:-2,:,:].to(device) # (b, t, w, h)
+            
 
             # lulc classifer
-            output_list = net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
+            output_list = net(imgs[:, :, :, :, :]) # all factors but lc, 4 years
             # output_list = net(imgs)
-            masks_pred = output_list[0] # (b, t, c, w, h)
-            _, masks_pred_max = torch.max(masks_pred.data, 2) # what is dim 2? the classes?? [4, 6, 7, 256, 256]
-            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), true_masks) # 4 years, (b, c, t, w, h)
+            masks_pred = output_list[0].squeeze() # (b, t, c, w, h)
+            #_, masks_pred_max = torch.max(masks_pred.data, 2) # what is dim 2? the classes?? [4, 6, 7, 256, 256]
+            # loss = criterion(masks_pred.permute(0, 2, 1, 3, 4).float(), true_masks.float()) # 4 years, (b, c, t, w, h)
+            # lin = nn.Linear(1,1)
+            # pred = lin(masks_pred.permute(0,1,3,4,2)).permute(0,1,4,2,3)
+            # pred.to(device)
+            # loss = criterion(pred.squeeze().float(), true_masks.float()) # 4 years, (b, c, t, w, h), squeeze removes channel dim 1
+            loss = criterion(masks_pred.float(), true_masks.float()) # 4 years, (b, c, t, w, h), squeeze removes channel dim 1
 
             # epoch_loss += loss.item()
             optimizer.zero_grad() # set the gradients to zero
@@ -216,7 +231,8 @@ def train_ConvGRU(config):
 
             # get acc
             # _, masks_pred_max = torch.max(masks_pred.data, 2)
-            pred_for_acc = masks_pred_max[:,-1,:,:] # last year?
+            # pred_for_acc = pred[:,-1,0,:,:] # last year?
+            pred_for_acc = masks_pred[:,-1,:,:] # last year?
             true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:] # last year?
 
             corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
@@ -229,7 +245,7 @@ def train_ConvGRU(config):
 
             if i % 5 == 0:
 
-                print('Epoch [{} / 15], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,i+1,
+                print('Epoch [{} / {}], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,config["epochs"],i+1,
                                                                                          loss.item(),batch_acc))
         
         train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
@@ -265,7 +281,7 @@ def train_ConvGRU(config):
         print('---------------------------------------------------------------------------------------------------------')
 
         if config["save_cp"]:
-            dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}/".format(config["model_n"], config["lr"], config["batch_size"])
+            dir_checkpoint = proj_dir + "data/ckpts/pop_pred/{}/lr{}_bs{}/".format(config["model_n"], config["lr"], config["batch_size"])
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
                        dir_checkpoint + f'CP_epoch{epoch}.pth')
@@ -275,7 +291,7 @@ def train_ConvGRU(config):
             train_record.update(val_record)
             record_df = pd.DataFrame(train_record, index=[epoch])
             df = df.append(record_df)
-            record_dir = proj_dir + 'data/record/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+            record_dir = proj_dir + 'data/record/pop_pred/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(record_dir, exist_ok=True)
             df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
 
@@ -291,14 +307,14 @@ gpu_usage()
 # define random choice of hyperparameters
 config = {
         "l1": 2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
-        "l2": "na", # 2 ** np.random.randint(2, 8),
+        "l2": 'na', # 2 ** np.random.randint(2, 8),
         "lr": np.random.uniform(0.01, 0.00001), # [0.1, 0.00001]
         "batch_size": random.choice([2, 4, 6, 8]),
-        "epochs": 15,
-        "model_n" : 'No_seed_convLSTM_20y_4c_no_na_oh_norm_random_search_15-20',
+        "epochs": 50,
+        "model_n" : 'pop_No_seed_20y_4c_rand_srch_15-20',
         "save_cp" : True,
         "save_csv" : True,
-        "n_years" : 20,
+        "n_years" : 6,
         "n_classes" : 4
     }
 
