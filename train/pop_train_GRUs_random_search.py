@@ -26,13 +26,14 @@ import numpy as np
 from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 from GPUtil import showUtilization as gpu_usage
 import random
+from sklearn import metrics
 
 
 print("initial usage")
 gpu_usage()
 
-proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+# proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = 'cpu'
@@ -106,14 +107,14 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
 
             output_list = net(test_img[:, :, 1:, :, :]) # all except lc
             masks_pred = output_list[0]
-            pred_prob = torch.softmax(torch.squeeze(masks_pred), dim=1).data.cpu().numpy()
+            pred = masks_pred[:,-1,:,:,:].squeeze().numpy()
             
             criterion = nn.CrossEntropyLoss() # for validation loss
-            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), test_img[:,:,0,:,:].long()) # for validation loss
+            loss = criterion(masks_pred.squeeze(), test_img[:,:,0,:,:].squeeze()) # for validation loss
             
             
-            pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:, :, :])
-            pred_img_list.append(pred_img)
+            # pred_img = np.squeeze(np.argmax(pred_prob, axis=0)[-1:, :, :])
+            pred_img_list.append(pred)
     pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
 
     h = 0
@@ -157,7 +158,7 @@ args = get_args()
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
 
-input_channel = 10                                            # 19 driving factors
+input_channel = 6                                            # 19 driving factors
 factor = 'with_factors'
 pred_sequence = 'forward'
 
@@ -215,14 +216,14 @@ def train_ConvGRU(config):
             # imgs = min_max_scale(imgs) # added to scale all factors but the lc
             imgs = Variable(imgs[:,-6:-2,:,:,:])
 
-            true_masks = Variable(true_masks[:,-6:-2,:,:].to(device=device, dtype=torch.long)) 
+            true_masks = Variable(true_masks[:,-6:-2,:,:].to(device=device, dtype=torch.float32)) 
 
             # lulc classifer
             output_list = net(imgs[:, :, 1:, :, :]) # 1: for all factors but lc, 4 years
             # output_list = net(imgs)
             masks_pred = output_list[0] # (b, t, c, w, h)
-            _, masks_pred_max = torch.max(masks_pred.data, 2) # what is dim 2? the classes?? [4, 6, 7, 256, 256]
-            loss = criterion(masks_pred.permute(0, 2, 1, 3, 4), true_masks) # 4 years, (b, c, t, w, h)
+            #_, masks_pred_max = torch.max(masks_pred.data, 2) # what is dim 2? the classes?? [4, 6, 7, 256, 256]
+            loss = criterion(masks_pred.squeeze(), true_masks) # 4 years, (b, c, t, w, h)
 
             # epoch_loss += loss.item()
             optimizer.zero_grad() # set the gradients to zero
@@ -232,13 +233,18 @@ def train_ConvGRU(config):
 
             # get acc
             # _, masks_pred_max = torch.max(masks_pred.data, 2)
-            pred_for_acc = masks_pred_max[:,-1,:,:] # last year?
-            true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:] # last year?
+            pred_for_acc = masks_pred[:,-1,:,:].reshape(-1).detach().numpy() # last year?
+            true_masks_for_acc = true_masks[:,-1,:,:].reshape(-1).detach().numpy() # [:,-1,:,:] # last year?
+            
+            
+            mae = metrics.mean_absolute_error(pred_for_acc, true_masks_for_acc)
+            #mse = metrics.mean_squared_error(pred_for_acc, true_masks_for_acc)
+            #r2 = metrics.r2_score(pred_for_acc, true_masks_for_acc)
 
-            corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
-            tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
-            acc += float(corr) / float(tensor_size)
-            batch_acc = acc/(i+1)
+            # corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
+            # tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
+            # acc += float(corr) / float(tensor_size)
+            batch_acc = mae/(i+1)
 
             train_record['train_loss'] += loss.item()
             train_record['train_acc'] += batch_acc
@@ -282,27 +288,27 @@ def train_ConvGRU(config):
 
         print('---------------------------------------------------------------------------------------------------------')
 
-        if config["save_cp"]:
-            dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}/".format(config["model_n"], config["lr"], config["batch_size"])
-            os.makedirs(dir_checkpoint, exist_ok=True)
-            torch.save(net.state_dict(),
-                       dir_checkpoint + f'CP_epoch{epoch}.pth')
-            logging.info(f'Checkpoint {epoch} saved !')
+        # if config["save_cp"]:
+        #     dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}/".format(config["model_n"], config["lr"], config["batch_size"])
+        #     os.makedirs(dir_checkpoint, exist_ok=True)
+        #     torch.save(net.state_dict(),
+        #                dir_checkpoint + f'CP_epoch{epoch}.pth')
+        #     logging.info(f'Checkpoint {epoch} saved !')
         
-        if config["save_csv"]:
-            train_record.update(val_record)
-            record_df = pd.DataFrame(train_record, index=[epoch])
-            df = df.append(record_df)
-            record_dir = proj_dir + 'data/record/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
-            os.makedirs(record_dir, exist_ok=True)
-            df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
+        # if config["save_csv"]:
+        #     train_record.update(val_record)
+        #     record_df = pd.DataFrame(train_record, index=[epoch])
+        #     df = df.append(record_df)
+        #     record_dir = proj_dir + 'data/record/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+        #     os.makedirs(record_dir, exist_ok=True)
+        #     df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
 
 
         # Early stopping
-        early_stopping(train_record['train_loss'], val_record['val_loss'])
-        if early_stopping.early_stop:
-            print("We are at epoch:", epoch)
-            break
+        # early_stopping(train_record['train_loss'], val_record['val_loss'])
+        # if early_stopping.early_stop:
+        #     print("We are at epoch:", epoch)
+        #     break
 
 
         
