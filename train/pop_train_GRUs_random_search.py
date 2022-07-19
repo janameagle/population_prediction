@@ -27,13 +27,14 @@ from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blo
 from GPUtil import showUtilization as gpu_usage
 import random
 import matplotlib.pyplot as plt
+from sklearn import metrics
 
 
 print("initial usage")
 gpu_usage()
 
-proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+# proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = 'cpu'
@@ -107,6 +108,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
                                                                                    dtype=torch.float32)
 
             output_list = net(test_img[:, :, 1:, :, :]) # all except lc
+
             masks_pred = output_list[0].squeeze()
             # lin = nn.Linear(1,1)
             # pred = lin(masks_pred.permute(0,1,3,4,2)).permute(0,1,4,2,3)
@@ -140,7 +142,21 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
     return k, acc, loss.item()
 
 
+class EarlyStopping():
+    def __init__(self, tolerance=5, min_delta=0):
 
+        self.tolerance = tolerance
+        self.min_delta = min_delta
+        self.counter = 0
+        self.early_stop = False
+
+    def __call__(self, train_loss, validation_loss):
+        if (validation_loss - train_loss) > self.min_delta:
+            self.counter +=1
+            if self.counter >= self.tolerance:  
+                self.early_stop = True
+                
+early_stopping = EarlyStopping(tolerance=5, min_delta=10)               
 
 # from train_all script
 #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -152,7 +168,7 @@ args = get_args()
 bias_status = True #False                                          # ?
 beta = 0                                                           # ?
 
-input_channel = 10                                            # 19 driving factors
+input_channel = 6                                            # 19 driving factors
 factor = 'with_factors'
 pred_sequence = 'forward'
 
@@ -197,6 +213,8 @@ def train_ConvGRU(config):
     net.apply(weight_init)
     df = pd.DataFrame()
     
+    
+    
     for epoch in range(0, config["epochs"]):
         net.train()
         # epoch_loss = 0
@@ -208,12 +226,14 @@ def train_ConvGRU(config):
             # imgs = min_max_scale(imgs) # added to scale all factors but the lc
             imgs = Variable(imgs[:,-6:-2,:,:,:]) # 2015 - 2018
 
-            true_masks = true_masks[:,-6:-2,:,:].to(device) # (b, t, w, h)
+
+            true_masks = true_masks[:,-6:-2,:,:].to(device.float32) # (b, t, w, h)
             
 
             # lulc classifer
             output_list = net(imgs[:, :, :, :, :]) # all factors but lc, 4 years
             # output_list = net(imgs)
+
             masks_pred = output_list[0].squeeze() # (b, t, c, w, h)
             #_, masks_pred_max = torch.max(masks_pred.data, 2) # what is dim 2? the classes?? [4, 6, 7, 256, 256]
             # loss = criterion(masks_pred.permute(0, 2, 1, 3, 4).float(), true_masks.float()) # 4 years, (b, c, t, w, h)
@@ -221,7 +241,8 @@ def train_ConvGRU(config):
             # pred = lin(masks_pred.permute(0,1,3,4,2)).permute(0,1,4,2,3)
             # pred.to(device)
             # loss = criterion(pred.squeeze().float(), true_masks.float()) # 4 years, (b, c, t, w, h), squeeze removes channel dim 1
-            loss = criterion(masks_pred.float(), true_masks.float()) # 4 years, (b, c, t, w, h), squeeze removes channel dim 1
+            loss = criterion(masks_pred, true_masks) # 4 years, (b, c, t, w, h), squeeze removes channel dim 1
+
 
             # epoch_loss += loss.item()
             optimizer.zero_grad() # set the gradients to zero
@@ -231,14 +252,24 @@ def train_ConvGRU(config):
 
             # get acc
             # _, masks_pred_max = torch.max(masks_pred.data, 2)
+
             # pred_for_acc = pred[:,-1,0,:,:] # last year?
             pred_for_acc = masks_pred[:,-1,:,:] # last year?
             true_masks_for_acc = true_masks[:,-1,:,:] # [:,-1,:,:] # last year?
 
-            corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
-            tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
-            acc += float(corr) / float(tensor_size)
-            batch_acc = acc/(i+1)
+            # pred_for_acc = masks_pred[:,-1,:,:].reshape(-1).detach().numpy() # last year?
+            # true_masks_for_acc = true_masks[:,-1,:,:].reshape(-1).detach().numpy() # [:,-1,:,:] # last year?
+            
+            
+            mae = metrics.mean_absolute_error(pred_for_acc, true_masks_for_acc)
+            #mse = metrics.mean_squared_error(pred_for_acc, true_masks_for_acc)
+            #r2 = metrics.r2_score(pred_for_acc, true_masks_for_acc)
+
+
+            # corr = torch.sum(pred_for_acc == true_masks_for_acc.detach())
+            # tensor_size = pred_for_acc.size(0) * pred_for_acc.size(1) * pred_for_acc.size(2)
+            # acc += float(corr) / float(tensor_size)
+            batch_acc = mae/(i+1)
 
             train_record['train_loss'] += loss.item()
             train_record['train_acc'] += batch_acc
@@ -247,6 +278,8 @@ def train_ConvGRU(config):
 
                 print('Epoch [{} / {}], batch: {}, train loss: {}, train acc: {}'.format(epoch+1,config["epochs"],i+1,
                                                                                          loss.item(),batch_acc))
+            
+        
         
         train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
         train_record['train_acc'] = train_record['train_acc'] / len(train_loader)
@@ -280,6 +313,7 @@ def train_ConvGRU(config):
 
         print('---------------------------------------------------------------------------------------------------------')
 
+
         if config["save_cp"]:
             dir_checkpoint = proj_dir + "data/ckpts/pop_pred/{}/lr{}_bs{}/".format(config["model_n"], config["lr"], config["batch_size"])
             os.makedirs(dir_checkpoint, exist_ok=True)
@@ -296,6 +330,11 @@ def train_ConvGRU(config):
             df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
 
 
+        # Early stopping
+        early_stopping(train_record['train_loss'], val_record['val_loss'])
+        if early_stopping.early_stop:
+            print("We are at epoch:", epoch)
+            break
 
 
         
