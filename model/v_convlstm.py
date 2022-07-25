@@ -28,7 +28,7 @@ class ConvLSTMCell(nn.Module):
         self.bias = bias
 
         self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
-                              out_channels=4 * self.hidden_dim, # why 4? because 4 are needed for LSTM? i, f, o, g? Or 4 time steps?
+                              out_channels = 4 * self.hidden_dim, # why 4? because 4 are needed for LSTM? i, f, o, g? Or 4 time steps?
                               kernel_size=self.kernel_size,
                               padding=self.padding,
                               bias=self.bias)

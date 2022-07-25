@@ -7,7 +7,8 @@ import torchvision.transforms as transforms
 
 
 train_transform = transforms.Compose([
-    transforms.RandomRotation(degrees = 180, interpolation = transforms.InterpolationMode.NEAREST),
+    transforms.ToPILImage(),
+    transforms.RandomRotation(degrees = 180),
     transforms.ToTensor()
 ])
 
@@ -24,13 +25,13 @@ class MyDataset(Dataset):
         return len(self.ids)
 
     def __getitem__(self, index):
-        img = np.load(self.ids[index])
-        mask = np.load(self.msk_ids[index])
+        img = np.load(self.ids[index])[[0,3,7,11],1:,:,:]
+        mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:]
 
         
         
-        #if self.transf is not None: # create random augmentation -> random subimage
-            # img = self.transf(img)
+        # if self.transf is not None: # create random augmentation -> random subimage
+        #     img = self.transf(img)
 
         #     img_size = img.shape[-1] # width or height
         #     crop_size = 25
