@@ -88,7 +88,7 @@ if __name__ == '__main__':
     df = pd.DataFrame()
     valid_record = {'kappa': 0, 'mae': 0}
 
-    dir_checkpoint = proj_dir + "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00638_bs6/CP_epoch15.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
 
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
@@ -107,8 +107,8 @@ if __name__ == '__main__':
                                                                                    dtype=torch.float32)
 
             net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[8, 1], # args.n_features],
-                          kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
+                          hidden_dim=[4, 32, 1], # args.n_features],
+                          kernel_size=(3, 3), num_layers= 3 , # num_layers= args.n_layer,
                           batch_first=True, bias=bias_status, return_all_layers=False)
 
             net.to(device)
@@ -147,7 +147,7 @@ if __name__ == '__main__':
 
 
 
-    save_path = proj_dir + 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00638_bs6/'#.format(pred_seq, model_n,factor_option)
+    save_path = proj_dir + 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
 
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)

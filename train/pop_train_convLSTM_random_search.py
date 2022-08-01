@@ -165,14 +165,14 @@ def train_ConvGRU(config):
     
     
     net = ConvLSTM(input_dim = input_channel,
-                   hidden_dim=[config['l1'], 1], #args.n_features], 
-                   kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
+                   hidden_dim=[config['l1'], config['l2'], 1], #args.n_features], 
+                   kernel_size=(3, 3), num_layers = 3, # num_layers=args.n_layer,
                    batch_first=True, bias=bias_status, return_all_layers=False)
     net.to(device)
     
     
     optimizer = optim.Adam(net.parameters(), lr = config['lr'], betas = (0.9, 0.999))
-    # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.1, patience=10, verbose=True)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.1, patience=10, verbose=True)
     criterion = nn.MSELoss() # no crossentropyloss for regression
 
     net.apply(weight_init)
@@ -232,7 +232,7 @@ def train_ConvGRU(config):
         
         print(train_record)
         
-        # scheduler.step(batch_mae)
+        scheduler.step(batch_mae)
         # scheduler.step()
         # ===================================== Validation ====================================#
         with torch.no_grad():
@@ -277,7 +277,7 @@ def train_ConvGRU(config):
             df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
 
 
-        if i == 0:
+        if epoch == 0:
             with open(record_dir + '/config.csv', 'w') as csvfile:
                 writer = csv.DictWriter(csvfile, config.keys())
                 writer.writeheader()
@@ -300,8 +300,8 @@ gpu_usage()
 # define random choice of hyperparameters
 config = {
         "l1": 2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
-        "l2": 'na', # 2 ** np.random.randint(2, 8),
-        "lr": round(np.random.uniform(0.01, 0.00001), 5), # [0.1, 0.00001]
+        "l2": 2 ** np.random.randint(2, 8),
+        "lr": round(np.random.uniform(0.1, 0.00001), 5), # [0.1, 0.00001]
         "batch_size": random.choice([2, 4, 6, 8]),
         "epochs": 50,
         "model_n" : 'pop_No_seed_20y_4c_rand_srch_15-20',
@@ -324,7 +324,7 @@ starttime = time.time()
 train_ConvGRU(config)
 
 time = time.time() - starttime
-print(time)
+print(str(time/3600) + ' h')
 
 
 
