@@ -15,14 +15,27 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 from sklearn import metrics
+from skimage.metrics import structural_similarity
+import pandas as pd
 
 
 # read predicted data
-specs = 'lr0.00145_bs2'
 n_years = 20
 n_classes = 4
-pred_path = proj_dir + 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/{}/pred_msk_eval_rescaled.npy'.format(specs)
+
+# define config
+config = {
+        "l1": 64,
+        "l2": 'na',
+        "lr": 0.0012,
+        "batch_size": 6,
+        "epochs": 50,
+        "model_n" : 'pop_10-20_2y'}
+
+# pred_path = proj_dir + 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/{}/pred_msk_eval_rescaled.npy'.format(specs)
+pred_path =  save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_rescaled.npy".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
 gt_path = proj_dir + 'data/ori_data/pop_pred/input_all_{}y_{}c_no_na_oh.npy'.format(n_years, n_classes)
+save_path = proj_dir + 'data/test/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
 
 pred = np.load(pred_path)
 gt = np.load(gt_path)
@@ -59,8 +72,8 @@ diffcmap = ListedColormap(newcolors, name='RdGn')
 
 def spatial_plot(pop16, pop20, diff16pred, diff20pred, pred):
     # plot the differences to see prediction accuracy
-    fig, axs = plt.subplots(figsize = (15,8))
-    outer_grid = fig.add_gridspec(4, 4, wspace=0, hspace=0)
+    fig, axs = plt.subplots(figsize = (15, 8))
+    # outer_grid = fig.add_gridspec(4, 4, wspace=0, hspace=0)
     
     ax1 = plt.subplot(241)
     p16 = ax1.imshow(pop16[100:750, 0:750], cmap = popcmap, vmin = 0, vmax = 300)
@@ -93,13 +106,33 @@ def spatial_plot(pop16, pop20, diff16pred, diff20pred, pred):
     fig.colorbar(pr, ax = ax5)
     
     # add text
-    fig.text(0.625, 0.12, 'Model: {}, y15-20'.format(specs),
+    fig.text(0.5, 0.12, 'Model: {}, lr {}, bs: {}, l1: {}, l2: {}, ep: {}'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]),
              verticalalignment='bottom', fontsize = 12)
     
-    plt.show()
     
     # finally save to file
-    # plt.savefig(save_path + 'Prediction_comparison')
+    plt.savefig(save_path + 'spatial_pred_check.png')
+    
+    
+    # save subplots
+    diff16 = plt.figure(figsize = (20,16))
+    plt.imshow(diff16pred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
+    plt.title("Diff pred - 2016")
+    plt.colorbar(location = 'right')
+    diff16.savefig(save_path + 'spatial_pred_check_2016.png')
+    
+    
+    diff20 = plt.figure(figsize = (20,16))
+    plt.imshow(diff20pred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
+    plt.title("Diff pred - 2020")
+    plt.colorbar(location = 'right')
+    diff20.savefig(save_path + 'spatial_pred_check_2020.png')
+
+    pred20 = plt.figure(figsize = (20,16))
+    plt.imshow(pred[100:750, 0:750], cmap = popcmap, vmin = 0, vmax = 300)
+    plt.title("Prediction of 2020")
+    plt.colorbar(location = 'right')
+    pred20.savefig(save_path + 'prediction_2020.png')
 
 
 
@@ -129,7 +162,13 @@ def scatter_plot(pop20, pred):
     mae = round(metrics.mean_absolute_error(pred, pop20), 3)
     rmse = round(metrics.mean_squared_error(pred, pop20, squared = False), 3)
     r2 = round(metrics.r2_score(pred, pop20), 3)
+    ssim = round(structural_similarity(pred, pop20), 3)
     
+    errors = {'measure': ['mae', 'rmse', 'r2', 'ssim'],
+        'value': [mae, rmse, r2, ssim]}
+    
+    # save in df
+    errors_df = pd.DataFrame(errors)
     
     ###########################################################
     # pretty scatter plot
@@ -156,17 +195,18 @@ def scatter_plot(pop20, pred):
     fig.colorbar(plot, ax = ax).set_label('Population')
     
     # add text
-    fig.text(0.8, 0.095, 'Model: {}, y15-20'.format(specs),
+    fig.text(0.7, 0.095, 'Model: {}, lr {}, bs: {}, l1: {}, l2: {}, ep: {}'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]),
              verticalalignment='bottom', horizontalalignment = 'right', 
              fontsize = 10)
-    fig.text(0.1, 0.72, ' R²: {} \n RMSE: {} \n MAE: {}'.format(r2, rmse, mae), fontsize = 10)
+    fig.text(0.1, 0.72, ' R²: {} \n RMSE: {} \n MAE: {} \n SSIM: {}'.format(r2, rmse, mae, ssim), fontsize = 10)
     
     fig.tight_layout()
     
     # finally save to file
-    # plt.savefig(save_path + 'Prediction_comparison')
+    plt.savefig(save_path + 'scatter_pred_check.png')
     
-
+    
+    errors_df.to_csv(save_path + 'error_measures.csv')
 
 
 

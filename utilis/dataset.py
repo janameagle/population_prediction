@@ -14,21 +14,46 @@ train_transform = transforms.Compose([
 
 
 class MyDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, transform = train_transform):                  
+    def __init__(self, imgs_dir, masks_dir, transform = train_transform, model_name = 'none'):                  
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.ids = [os.path.join(imgs_dir, x) for x in os.listdir(imgs_dir)]   # direction of images
         self.msk_ids = [os.path.join(masks_dir, x) for x in os.listdir(masks_dir)]
         self.transf = transform
+        self.model_name = model_name
 
     def __len__(self): # number of images
         return len(self.ids)
 
     def __getitem__(self, index):
-        img = np.load(self.ids[index])[[0,3,7,11],1:,:,:]
-        mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:]
-
+        if self.model_name == 'pop_01-20_4y':
+            img = np.load(self.ids[index])[[0,3,7,11],1:,:,:] # 2001-2012, 4y interval
+            mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:] # 2004-2016, 4y interval
         
+        elif self.model_name == 'pop_05-20_3y':
+            img = np.load(self.ids[index])[[4,7,10,13],1:,:,:] # 2005-2014, 3y interval
+            mask = np.load(self.msk_ids[index])[[7,10,13,16],:,:] # 2008-2017, 3y interval
+        
+        elif self.model_name == 'pop_10-20_2y':
+            img = np.load(self.ids[index])[[9,11,13,15],1:,:,:] # 2010-2016, 2y interval
+            mask = np.load(self.msk_ids[index])[[11,13,15,17],:,:] # 2012-2018, 2y interval
+        
+        elif self.model_name == 'pop_15-20_1y':
+            img = np.load(self.ids[index])[[14,15,16,17],1:,:,:] # 2015-2018, 1y interval
+            mask = np.load(self.msk_ids[index])[[15,16,17,18],:,:] # 2016-2019, 1y interval
+        
+        elif self.model_name == 'pop_02-20_3y':
+            img = np.load(self.ids[index])[[1,4,7,10,13],1:,:,:] # 2002-2014, 3y interval
+            mask = np.load(self.msk_ids[index])[[4,7,10,13,16],:,:] # 2005-2017, 3y interval
+            
+        elif self.model_name == 'pop_02-20_2y':
+            img = np.load(self.ids[index])[[1,3,5,7,9,11,13,15],1:,:,:] # 2002-2016, 2y interval
+            mask = np.load(self.msk_ids[index])[[3,5,7,9,11,13,15,17],:,:] # 2004-2018, 2y interval
+            
+        elif self.model_name == 'pop_01_20_1y':
+            img = np.load(self.ids[index])[0:18,1:,:,:] # 2001-2018, 1y interval
+            mask = np.load(self.msk_ids[index])[1:19,:,:] # 2002-2019, 1y interval
+            
         
         # if self.transf is not None: # create random augmentation -> random subimage
         #     img = self.transf(img)

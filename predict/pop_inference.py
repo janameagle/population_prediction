@@ -22,8 +22,9 @@ proj_dir = "H:/Masterarbeit/population_prediction/"
 
 def evaluate(gt, pred):
     mae = metrics.mean_absolute_error(gt, pred)
+    rmse = metrics.mean_squared_error(gt, pred, squared = False)
             
-    return mae
+    return mae, rmse
 
 
 def get_subsample_centroids(img, img_size=50):
@@ -66,6 +67,17 @@ def get_args():
 
 n_years = 20
 n_classes = 4
+# define config
+config = {
+        "l1": 64,
+        "l2": 'na',
+        "lr": 0.0012,
+        "batch_size": 6,
+        "epochs": 50,
+        "model_n" : 'pop_10-20_2y'}
+
+
+
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -79,16 +91,43 @@ if __name__ == '__main__':
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     processed_ori_data = ori_data
-    valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # [-5,-1, 1:, :, :] = years 2000 - 2020, no lc unnormed
+    #valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # 2004-2016, 4y interval, no lc unnormed
+    # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
+    valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
+    # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
+    if config['model_n'] == 'pop_01-20_4y':
+        valid_input = processed_ori_data[[3,7,11,15], :, :, :] # years 2004-2016, 4y interval
+    
+    elif config['model_n'] == 'pop_05-20_3y':
+        valid_input = processed_ori_data[[7,10,13,16], :, :, :] # years 2008-2017, 3y interval
+    
+    elif config['model_n'] == 'pop_10-20_2y':
+        valid_input = processed_ori_data[[11,13,15,17] :, :, :] # years 2012-2018, 2y interval
+    
+    elif config['model_n'] == 'pop_15-20_1y':
+        valid_input = processed_ori_data[[15,16,17,18], :, :, :] # years 2016-2019, 1y interval
+        
+    elif config['model_n'] == 'Pop_02-20_3y':
+        valid_input = processed_ori_data[[4,7,10,13,16], :, :, :] # years 2005-2017, 3y interval
+    
+    elif config['model_n'] == 'Pop_02-20_2y':
+        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17], :, :, :] # years 2004-2018, 2y interval
+    
+    elif config['model_n'] == 'Pop_01_20_1y':
+        valid_input = processed_ori_data[1:19, :, :, :] # years 2002-2019, 1y interval
+    
+    
+    
     gt = processed_ori_data[-1, 1, :, :] # last year, pop
     print('valid_sequence shape: ', valid_input.shape) # t,c,w,h; pop, ...
 
     input_channel = 10 # 19
 
     df = pd.DataFrame()
-    valid_record = {'kappa': 0, 'mae': 0}
+    valid_record = {'mae': 0, 'rmse': 0}
 
-    dir_checkpoint = proj_dir + "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
+    # "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
 
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
@@ -107,8 +146,8 @@ if __name__ == '__main__':
                                                                                    dtype=torch.float32)
 
             net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[4, 32, 1], # args.n_features],
-                          kernel_size=(3, 3), num_layers= 3 , # num_layers= args.n_layer,
+                          hidden_dim=[64, 1], # args.n_features],
+                          kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
                           batch_first=True, bias=bias_status, return_all_layers=False)
 
             net.to(device)
@@ -133,8 +172,9 @@ if __name__ == '__main__':
             pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
             h += 1
 
-    val_mae = evaluate(gt, pred_msk)
+    val_mae, val_rmse = evaluate(gt, pred_msk)
     print('mae: ', val_mae)
+    print('rmse: ', val_rmse)
     plt.imshow(pred_msk)
 
     # rescale to actual pop values
@@ -147,14 +187,16 @@ if __name__ == '__main__':
 
 
 
-    save_path = proj_dir + 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
+    save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+    # 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
 
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
     np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
-    cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
-
+    #cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
+    plt.savefig(save_path + 'pred_msk_eval.png')
+    
 
 import tifffile
 tifffile.imwrite(save_path + 'pred_msk_normed.tif', pred_msk)

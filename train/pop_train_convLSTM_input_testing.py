@@ -38,14 +38,14 @@ proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(device)
 # device = 'cpu'
 
 
 def evaluate(gt, pred):
-    mae = metrics.mean_absolute_error(gt, pred)
+    # mae = metrics.mean_absolute_error(gt, pred)
+    rmse = metrics.mean_squared_error(gt, pred, squared = False)
             
-    return mae
+    return rmse
 
 def get_subsample_centroids(img, img_size=50):
     h_total = img.shape[-2]
@@ -68,13 +68,34 @@ def get_subsample_centroids(img, img_size=50):
 
 
 
-def get_valid_dataset(ori_data_dir):
+def get_valid_dataset(ori_data_dir, model_name):
     ori_data = np.load(ori_data_dir)
     processed_ori_data = ori_data
     # valid_input = processed_ori_data[-5:, :, :, :] # years 2016 - 2019
     # valid_input = processed_ori_data[-5:, :, :, :] # years 2016 - 2019
     # gt = processed_ori_data[-1, 1, :, :] # last year, pop
-    valid_input = processed_ori_data[[3,7,11,15,19], :, :, :] # years 2004-2020
+    if model_name == 'pop_01-20_4y':
+        valid_input = processed_ori_data[[3,7,11,15,19], :, :, :] # years 2004-2020, 4y interval
+    
+    elif model_name == 'pop_05-20_3y':
+        valid_input = processed_ori_data[[7,10,13,16,19], :, :, :] # years 2008-2020, 3y interval
+    
+    elif model_name == 'pop_10-20_2y':
+        valid_input = processed_ori_data[[11,13,15,17,19], :, :, :] # years 2012-2020, 2y interval
+    
+    elif model_name == 'pop_15-20_1y':
+        valid_input = processed_ori_data[[15,16,17,18,19], :, :, :] # years 2016-2020, 1y interval
+        
+    elif model_name == 'pop_02-20_3y':
+        valid_input = processed_ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
+    
+    elif model_name == 'pop_02-20_2y':
+        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
+    
+    elif model_name == 'pop_01_20_1y':
+        valid_input = processed_ori_data[1:, :, :, :] # years 2002-2020, 1y interval
+        
+        
     gt = processed_ori_data[19, 1, :, :] # last year, pop
     return valid_input, gt
 
@@ -118,10 +139,10 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
             pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248, 8:248]
             h += 1
 
-    val_mae = evaluate(gt, pred_msk)
+    val_rmse = evaluate(gt, pred_msk)
     plt.imshow(pred_msk)
 
-    return val_mae, loss.item()
+    return val_rmse, loss.item()
 
 
 class EarlyStopping():
@@ -157,11 +178,11 @@ def train_ConvGRU(config):
     liveloss = PlotLosses()
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
     train_dir = dataset_dir + "train/pop_pred_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm/"
-    train_data = MyDataset(imgs_dir = train_dir + 'input/', masks_dir = train_dir +'target/')
+    train_data = MyDataset(imgs_dir = train_dir + 'input/', masks_dir = train_dir +'target/', model_name = config['model_n'])
     train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
     
     ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm.npy"
-    valid_input, gt = get_valid_dataset(ori_data_dir)
+    valid_input, gt = get_valid_dataset(ori_data_dir, model_name = config['model_n'])
     
     
     
@@ -183,8 +204,8 @@ def train_ConvGRU(config):
     
     for epoch in range(0, config["epochs"]):
         net.train()
-        mae = 0
-        train_record = {'train_loss': 0, 'train_mae': 0}
+        rmse = 0
+        train_record = {'train_loss': 0, 'train_rmse': 0}
 
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32) # (b, t, c, w, h)
@@ -212,46 +233,46 @@ def train_ConvGRU(config):
             true_masks_for_acc = true_masks[:,-1,:,:].reshape(true_masks.shape[0]*true_masks.shape[-2]*true_masks.shape[-1]).detach().numpy() # last year?
 
             
-            mae += metrics.mean_absolute_error(pred_for_acc, true_masks_for_acc)
-            #mse = metrics.mean_squared_error(pred_for_acc, true_masks_for_acc)
-            #r2 = metrics.r2_score(pred_for_acc, true_masks_for_acc)
+            # mae += metrics.mean_absolute_error(pred_for_acc, true_masks_for_acc)
+            rmse += metrics.mean_squared_error(pred_for_acc, true_masks_for_acc, squared = False)
+            # r2 = metrics.r2_score(pred_for_acc, true_masks_for_acc)
 
-            batch_mae = mae/(i+1)
+            batch_rmse = rmse/(i+1)
 
             train_record['train_loss'] += loss.item()
-            train_record['train_mae'] += batch_mae
+            train_record['train_rmse'] += batch_rmse
 
             if i % 5 == 0:
 
-                print('Epoch [{} / {}], batch: {}, train loss: {}, train mae: {}'.format(epoch+1,config["epochs"],i+1,
-                                                                                         loss.item(), batch_mae))
+                print('Epoch [{} / {}], batch: {}, train loss: {}, train rmse: {}'.format(epoch+1,config["epochs"],i+1,
+                                                                                         loss.item(), batch_rmse))
             
         
         
         train_record['train_loss'] = train_record['train_loss'] / len(train_loader)
-        train_record['train_mae'] = train_record['train_mae'] / len(train_loader)
+        train_record['train_rmse'] = train_record['train_rmse'] / len(train_loader)
         
         print(train_record)
         
-        scheduler.step(batch_mae)
+        scheduler.step(batch_rmse)
         # scheduler.step()
         # ===================================== Validation ====================================#
         with torch.no_grad():
             net.eval()
 
-            val_record = {'val_kappa': 0, 'val_mae': 0, 'val_loss': 0}
-            val_mae, ls = get_valid_record(valid_input, gt, net, factor_option='with_factors')
+            val_record = {'val_loss': 0, 'val_rmse': 0}
+            val_rmse, ls = get_valid_record(valid_input, gt, net, factor_option='with_factors')
 
             # val_record['val_kappa'] = k
-            val_record['val_mae'] = val_mae
+            val_record['val_rmse'] = val_rmse
             #val_record['val_QA'] = QA
             val_record['val_loss'] = ls
 
             print(val_record)
          
             liveloss.update({
-                'mae': train_record['train_mae'],
-                'val_mae': val_record['val_mae'],
+                'rmse': train_record['train_rmse'],
+                'val_rmse': val_record['val_rmse'],
                 'loss': train_record['train_loss'],
                 'val_loss': val_record['val_loss']
                 })
@@ -263,7 +284,7 @@ def train_ConvGRU(config):
 
 
         if config["save_cp"]:
-            dir_checkpoint = proj_dir + "data/ckpts/pop_pred/{}/lr{}_bs{}/".format(config["model_n"], config["lr"], config["batch_size"])
+            dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
                        dir_checkpoint + f'CP_epoch{epoch}.pth')
@@ -273,9 +294,9 @@ def train_ConvGRU(config):
             train_record.update(val_record)
             record_df = pd.DataFrame(train_record, index=[epoch])
             df = df.append(record_df)
-            record_dir = proj_dir + 'data/record/pop_pred/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+            record_dir = proj_dir + 'data/record/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(record_dir, exist_ok=True)
-            df.to_csv(record_dir + '{}_lr{}_layer{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], args.n_layer, config["batch_size"], config["l1"], config["l2"]))
+            df.to_csv(record_dir + '{}_lr{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], config["batch_size"], config["l1"], config["l2"]))
 
 
         if epoch == 0:
@@ -300,12 +321,12 @@ gpu_usage()
 
 # define random choice of hyperparameters
 config = {
-        "l1": 64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
-        "l2": 'na', #2 ** np.random.randint(2, 8),
-        "lr": round(np.random.uniform(0.002, 0.00001), 4), # [0.1, 0.00001]
-        "batch_size": 6,
+        "l1": 64, # 2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
+        "l2": 'na', # 2 ** np.random.randint(2, 8),
+        "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001]
+        "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : 'pop_No_seed_20y_4c_rand_srch_15-20',
+        "model_n" : 'pop_02-20_3y',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,
@@ -323,14 +344,28 @@ print(config)
 import time
 starttime = time.time()
 train_ConvGRU(config)
-
 time = time.time() - starttime
 print(str(time/3600) + ' h')
 
 
 
+config['model_n'] = 'pop_15-20_1y'
+starttime2 = time.time()
+train_ConvGRU(config)
+time2 = time.time() - starttime2
+print(str(time2/3600) + ' h')
+
+
+config['model_n'] = 'pop_02-20_2y'
+starttime3 = time.time()
+train_ConvGRU(config)
+time3 = time.time() - starttime3
+print(str(time2/3600) + ' h')
 
 
 
-
-
+config['model_n'] = 'pop_01_20_1y'
+starttime4 = time.time()
+train_ConvGRU(config)
+time4 = time.time() - starttime4
+print(str(time2/3600) + ' h')

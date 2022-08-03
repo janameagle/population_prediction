@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import numpy as np
 
 class ConvLSTMCell(nn.Module):
 
@@ -100,7 +101,7 @@ class ConvLSTM(nn.Module):
         self.batch_first = batch_first
         self.bias = bias
         self.return_all_layers = return_all_layers
-        # self.time_steps = 4
+        self.time_steps = 4
 
         cell_list = []
         for i in range(0, self.num_layers):
@@ -183,4 +184,48 @@ class ConvLSTM(nn.Module):
         if not isinstance(param, list):
             param = [param] * num_layers
         return param
+
+
+
+###############################################################################
+# Convolutional bidirectional LSTM
+
+class ConvBLSTM(nn.Module):
+    def __init__(self, input_dim, hidden_dim, kernel_size, num_layers, 
+                 batch_first=False, bias=True, return_all_layers=False):
+        super(ConvBLSTM, self).__init__()
+    
+        self.return_all_layers = return_all_layers
+        
+        self.forward_cell = ConvLSTM(input_dim, hidden_dim, 
+                                   kernel_size, num_layers, 
+                                   batch_first=False, bias=True, return_all_layers=False)
+        self.backward_cell = ConvLSTM(input_dim, hidden_dim, 
+                                   kernel_size, num_layers, 
+                                   batch_first=False, bias=True, return_all_layers=False)  
+
+
+    def forward(self, x):
+        y_out_forward = self.forward_cell(x)[0]
+        x_reversed = torch.flip(x, [1])
+        y_out_reverse = self.backward_cell(x_reversed)[0]
+        output = torch.cat((y_out_forward, y_out_reverse), dim=2)
+        if not self.return_all_layers:
+            output = torch.squeeze(output[:, -1,...], dim=1)
+        return output
+        
+   
+    
+   
+x1 = torch.randn([4, 10, 256, 256]) #(t, c, w, h)
+x2 = torch.randn([4, 10, 256, 256])
+
+cblstm = ConvBLSTM(input_dim=10, hidden_dim=[32, 1], kernel_size=(3, 3), num_layers = 2)
+
+x = torch.stack([x1, x2], dim=1)
+print(x.shape)
+out = cblstm(x)
+print (out.shape)
+out.sum().backward()    
+
 
