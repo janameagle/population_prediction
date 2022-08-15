@@ -74,7 +74,7 @@ config = {
         "lr": 0.0012,
         "batch_size": 6,
         "epochs": 50,
-        "model_n" : 'pop_10-20_2y'}
+        "model_n" : 'pop_02-20_2y'}
 
 
 
@@ -93,28 +93,28 @@ if __name__ == '__main__':
     processed_ori_data = ori_data
     #valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # 2004-2016, 4y interval, no lc unnormed
     # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
-    valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
+    # valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
     # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
     if config['model_n'] == 'pop_01-20_4y':
-        valid_input = processed_ori_data[[3,7,11,15], :, :, :] # years 2004-2016, 4y interval
+        valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # years 2004-2016, 4y interval
     
     elif config['model_n'] == 'pop_05-20_3y':
-        valid_input = processed_ori_data[[7,10,13,16], :, :, :] # years 2008-2017, 3y interval
+        valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # years 2008-2017, 3y interval
     
     elif config['model_n'] == 'pop_10-20_2y':
-        valid_input = processed_ori_data[[11,13,15,17] :, :, :] # years 2012-2018, 2y interval
+        valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # years 2012-2018, 2y interval
     
     elif config['model_n'] == 'pop_15-20_1y':
-        valid_input = processed_ori_data[[15,16,17,18], :, :, :] # years 2016-2019, 1y interval
+        valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # years 2016-2019, 1y interval
         
-    elif config['model_n'] == 'Pop_02-20_3y':
-        valid_input = processed_ori_data[[4,7,10,13,16], :, :, :] # years 2005-2017, 3y interval
+    elif config['model_n'] == 'pop_02-20_3y':
+        valid_input = processed_ori_data[[4,7,10,13,16], 1:, :, :] # years 2005-2017, 3y interval
     
-    elif config['model_n'] == 'Pop_02-20_2y':
-        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17], :, :, :] # years 2004-2018, 2y interval
+    elif config['model_n'] == 'pop_02-20_2y':
+        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17], 1:, :, :] # years 2004-2018, 2y interval
     
-    elif config['model_n'] == 'Pop_01_20_1y':
-        valid_input = processed_ori_data[1:19, :, :, :] # years 2002-2019, 1y interval
+    elif config['model_n'] == 'pop_01_20_1y':
+        valid_input = processed_ori_data[1:19, 1:, :, :] # years 2002-2019, 1y interval
     
     
     
@@ -155,7 +155,7 @@ if __name__ == '__main__':
           
             output_list = net(test_img) # all factors but lc
 
-            masks_pred = output_list[0].squeeze().view(args.seq_len, 256, 256) # t, c, w, h
+            masks_pred = output_list[0].squeeze().view(-1, 256, 256) # t, c, w, h
             pred_img_list.append(masks_pred[-1,:,:].cpu().numpy())
             
            

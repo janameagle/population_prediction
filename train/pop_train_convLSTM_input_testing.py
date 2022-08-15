@@ -342,25 +342,25 @@ print(config)
 
 # run with current set of random hyperparameters
 import time
-starttime = time.time()
-train_ConvGRU(config)
-time = time.time() - starttime
-print(str(time/3600) + ' h')
+# starttime = time.time()
+# train_ConvGRU(config)
+# time1 = time.time() - starttime
+# print(str(time1/3600) + ' h')
 
 
 
-config['model_n'] = 'pop_15-20_1y'
-starttime2 = time.time()
-train_ConvGRU(config)
-time2 = time.time() - starttime2
-print(str(time2/3600) + ' h')
+# config['model_n'] = 'pop_15-20_1y'
+# starttime2 = time.time()
+# train_ConvGRU(config)
+# time2 = time.time() - starttime2
+# print(str(time2/3600) + ' h')
 
 
-config['model_n'] = 'pop_02-20_2y'
-starttime3 = time.time()
-train_ConvGRU(config)
-time3 = time.time() - starttime3
-print(str(time2/3600) + ' h')
+# config['model_n'] = 'pop_02-20_2y'
+# starttime3 = time.time()
+# train_ConvGRU(config)
+# time3 = time.time() - starttime3
+# print(str(time2/3600) + ' h')
 
 
 
@@ -368,4 +368,4 @@ config['model_n'] = 'pop_01_20_1y'
 starttime4 = time.time()
 train_ConvGRU(config)
 time4 = time.time() - starttime4
-print(str(time2/3600) + ' h')
+print(str(time4/3600) + ' h')

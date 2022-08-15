@@ -30,12 +30,18 @@ config = {
         "lr": 0.0012,
         "batch_size": 6,
         "epochs": 50,
-        "model_n" : 'pop_10-20_2y'}
+        "model_n" : 'linear_regression'}
 
-# pred_path = proj_dir + 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/{}/pred_msk_eval_rescaled.npy'.format(specs)
+interval = int(config['model_n'][-2])
+lastyear = 20 - interval
+# interval = 1
+# lastyear = 20 - interval
+
 pred_path =  save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_rescaled.npy".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+# pred_path = save_path = proj_dir + "data/test/linear_regression/pred_msk_eval_rescaled.npy"
 gt_path = proj_dir + 'data/ori_data/pop_pred/input_all_{}y_{}c_no_na_oh.npy'.format(n_years, n_classes)
 save_path = proj_dir + 'data/test/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+# save_path = proj_dir + 'data/test/linear_regression/'
 
 pred = np.load(pred_path)
 gt = np.load(gt_path)
@@ -43,10 +49,10 @@ gt = np.load(gt_path)
 
 # differences between pred and gt
 pop = gt[:,1,:,:]
-pop16 = pop[15,:,:]
+poplast = pop[-interval-1,:,:]
 pop20 = pop[19,:,:]
 
-diff16pred = pred - pop16
+difflastpred = pred - poplast
 diff20pred = pred - pop20
 
 
@@ -70,16 +76,16 @@ diffcmap = ListedColormap(newcolors, name='RdGn')
 # spatial plot gt, pred, pred difference
 ###############################################################################
 
-def spatial_plot(pop16, pop20, diff16pred, diff20pred, pred):
+def spatial_plot(poplast, pop20, difflastpred, diff20pred, pred):
     # plot the differences to see prediction accuracy
     fig, axs = plt.subplots(figsize = (15, 8))
     # outer_grid = fig.add_gridspec(4, 4, wspace=0, hspace=0)
     
     ax1 = plt.subplot(241)
-    p16 = ax1.imshow(pop16[100:750, 0:750], cmap = popcmap, vmin = 0, vmax = 300)
-    ax1.set_title("Pop 2016")
+    plast = ax1.imshow(poplast[100:750, 0:750], cmap = popcmap, vmin = 0, vmax = 300)
+    ax1.set_title("Pop 20" + str(lastyear))
     ax1.set_axis_off()
-    #fig.colorbar(p16)
+    #fig.colorbar(plast)
     
     ax2 = plt.subplot(242)
     p20 = ax2.imshow(pop20[100:750, 0:750], cmap = popcmap, vmin = 0, vmax = 300)
@@ -88,10 +94,10 @@ def spatial_plot(pop16, pop20, diff16pred, diff20pred, pred):
     #fig.colorbar(p20, ax = ax2)
     
     ax3 = plt.subplot(245)
-    diff16 = ax3.imshow(diff16pred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
-    ax3.set_title("Diff pred - 2016")
+    difflast = ax3.imshow(difflastpred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
+    ax3.set_title("Diff pred - 20" + str(lastyear))
     ax3.set_axis_off()
-    #fig.colorbar(diff16, ax = ax3)
+    #fig.colorbar(difflast, ax = ax3)
     
     ax4 = plt.subplot(246)
     diff20 = ax4.imshow(diff20pred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
@@ -115,11 +121,11 @@ def spatial_plot(pop16, pop20, diff16pred, diff20pred, pred):
     
     
     # save subplots
-    diff16 = plt.figure(figsize = (20,16))
-    plt.imshow(diff16pred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
-    plt.title("Diff pred - 2016")
+    difflast = plt.figure(figsize = (20,16))
+    plt.imshow(difflastpred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
+    plt.title("Diff pred - 20" + str(lastyear))
     plt.colorbar(location = 'right')
-    diff16.savefig(save_path + 'spatial_pred_check_2016.png')
+    difflast.savefig(save_path + 'spatial_pred_check_20' + str(lastyear) + '.png')
     
     
     diff20 = plt.figure(figsize = (20,16))
@@ -228,7 +234,7 @@ def scatter_plot(pop20, pred):
 # do the plotting
 ###############################################################################
 
-spatial_plot(pop16, pop20, diff16pred, diff20pred, pred)
+spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
 
 scatter_plot(pop20, pred)
 
