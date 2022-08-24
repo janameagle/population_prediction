@@ -94,8 +94,16 @@ def get_valid_dataset(ori_data_dir, model_name):
     
     elif model_name == 'pop_01_20_1y':
         valid_input = processed_ori_data[1:, :, :, :] # years 2002-2020, 1y interval
+
+    elif model_name == 'pop_only_01_20_1y':
+        valid_input = processed_ori_data[1:, 1, :, :] # years 2002-2020, 1y interval
         
+    elif model_name == 'pop_only_01_20_4y':
+        valid_input = processed_ori_data[[3,7,11,15,19], 1, :, :] # years 2002-2020, 1y interval
+    
         
+    
+    
     gt = processed_ori_data[19, 1, :, :] # last year, pop
     return valid_input, gt
 
@@ -103,17 +111,17 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
     sub_img_list = []
     for x, y in zip(x_list, y_list):
-        sub_img = valid_input[:, :, x - 128:x + 128, y - 128:y + 128]
+        sub_img = valid_input[:, x - 128:x + 128, y - 128:y + 128]
         sub_img_list.append(sub_img)
 
     pred_img_list = []
     with torch.no_grad():
         for test_img in sub_img_list:
-    
+            test_img = test_img[:, np.newaxis, :,:]
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
-            output_list = net(test_img[:, :-1, 1:, :, :]) # all except lc, except last year
+            output_list = net(test_img[:, :, :, :, :]) # pop only, except last year
 
             pred_img = output_list[0].squeeze()
             # lin = nn.Linear(1,1)
@@ -121,7 +129,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
             
             pred_img = pred_img[-1,:,:] # take last year prediction
             criterion = nn.MSELoss() # no crossentropyloss for regression
-            loss = criterion(pred_img.float(), test_img[:,-1,1,:,:].squeeze().float()) # for validation loss
+            loss = criterion(pred_img.float(), test_img[:,-1,0,:,:].squeeze().float()) # for validation loss
 
             pred_img_list.append(pred_img.cpu().numpy())
    
@@ -169,7 +177,7 @@ args = get_args()
 bias_status = True                                         
 beta = 0                                                          
 
-input_channel = 10 # driving factors                                          
+input_channel = 1 # driving factors                                          
 factor = 'with_factors'
 pred_sequence = 'forward'
 
@@ -209,6 +217,7 @@ def train_ConvGRU(config):
 
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32) # (b, t, c, w, h)
+            imgs = imgs[:,:,np.newaxis,:,:]
 
             # imgs = Variable(imgs[:,-6:-2,1:,:,:]) # b, t, c, w, h, 2015 - 2018, no lc
             # imgs = Variable(imgs) # b, t, c, w, h, 2015 - 2018, no lc
@@ -287,7 +296,7 @@ def train_ConvGRU(config):
             dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
-                        dir_checkpoint + f'CP_epoch{epoch}.pth')
+                       dir_checkpoint + f'CP_epoch{epoch}.pth')
             logging.info(f'Checkpoint {epoch} saved !')
         
         if config["save_csv"]:
@@ -321,12 +330,12 @@ gpu_usage()
 
 # define random choice of hyperparameters
 config = {
-        "l1": 2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256] #64, # 
-        "l2": 2 ** np.random.randint(2, 8), # 'na', # 
-        "lr": round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001] # 0.0012, # 
+        "l1": 64, # 2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
+        "l2": 'na', # 2 ** np.random.randint(2, 8),
+        "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001]
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : 'pop_01_20_1y',
+        "model_n" : 'pop_only_01_20_4y',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,

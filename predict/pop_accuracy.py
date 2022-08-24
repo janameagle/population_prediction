@@ -28,20 +28,20 @@ config = {
         "l1": 64,
         "l2": 'na',
         "lr": 0.0012,
-        "batch_size": 6,
+        "batch_size": 1, # 6
         "epochs": 50,
-        "model_n" : 'linear_regression'}
+        "model_n" : 'pop_01_20_4y_LSTM'}
 
-interval = int(config['model_n'][-2])
-lastyear = 20 - interval
-# interval = 1
+# interval = int(config['model_n'][-2])
 # lastyear = 20 - interval
+interval = 4
+lastyear = 16
 
 pred_path =  save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_rescaled.npy".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
-# pred_path = save_path = proj_dir + "data/test/linear_regression/pred_msk_eval_rescaled.npy"
+# pred_path = save_path = proj_dir + "data/test/{}/pred_msk_eval_rescaled.npy".format(config['model_n'])
 gt_path = proj_dir + 'data/ori_data/pop_pred/input_all_{}y_{}c_no_na_oh.npy'.format(n_years, n_classes)
 save_path = proj_dir + 'data/test/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
-# save_path = proj_dir + 'data/test/linear_regression/'
+# save_path = proj_dir + 'data/test/{}/'.format(config['model_n'])
 
 pred = np.load(pred_path)
 gt = np.load(gt_path)
@@ -49,8 +49,8 @@ gt = np.load(gt_path)
 
 # differences between pred and gt
 pop = gt[:,1,:,:]
-poplast = pop[-interval-1,:,:]
-pop20 = pop[19,:,:]
+poplast = pop[lastyear-1,:,:]
+pop20 = pop[-1,:,:]
 
 difflastpred = pred - poplast
 diff20pred = pred - pop20
@@ -179,7 +179,7 @@ def scatter_plot(pop20, pred):
     ###########################################################
     # pretty scatter plot
     fig, ax = plt.subplots(figsize = (10,7))
-    plot = ax.scatter(pop20, pred, c = abs(pred - pop20), cmap = 'YlOrRd')
+    plot = ax.scatter(pop20, pred, c = abs(pred - pop20), cmap = 'YlOrRd', vmin = 0, vmax = 300)
     plt.plot(pop20, p(pop20), color = 'blue', linewidth = 0.02)
     
     # remove box around plot and ticks
@@ -198,7 +198,7 @@ def scatter_plot(pop20, pred):
     ax.set_title('Scatterplot prediction and ground truth')
     ax.set_ylabel('Prediction of 2020')
     ax.set_xlabel('Ground truth of 2020')
-    fig.colorbar(plot, ax = ax).set_label('Population')
+    fig.colorbar(plot, ax = ax).set_label('Diff pred - 2020')
     
     # add text
     fig.text(0.7, 0.095, 'Model: {}, lr {}, bs: {}, l1: {}, l2: {}, ep: {}'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]),
@@ -239,16 +239,32 @@ spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
 scatter_plot(pop20, pred)
 
 
+# pred_b = pred
+# pred_b[pred < 0] = -1
+# pred_b[pred == 0] = 0
+# pred_b[pred > 0] = 1
 
+# plt.imshow(pred_b)
+# plt.colorbar(location = 'right')
 
+# check = diff20pred
+# check[pred_b >= 0] = 0
+# check[check < -20] = -20
 
+# plt.imshow(check)
+# plt.colorbar(location = 'right')
 
+# pop20notnull = pop20[pop20>10]
+# prednotnull = pred[pop20>10]
 
+# scatter_plot(pop20notnull, prednotnull)
 
-
-
-
-
-
-
-
+# underestimated = np.zeros((pred.shape[0], pred.shape[1]))
+# underestimated[(pred<400) & (pop20 > 400)] = 1
+# overestimated = np.zeros((pred.shape[0], pred.shape[1]))
+# overestimated[(pred>350 )& (pop20 < 350)] = 1
+# plt.imshow(underestimated)
+# plt.imshow(overestimated)
+# negative = np.zeros((pred.shape[0], pred.shape[1]))
+# negative[pred<0] = 1
+# plt.imshow(negative)

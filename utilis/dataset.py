@@ -3,23 +3,23 @@ import torch
 from torch.utils.data import Dataset
 import os
 from sklearn.preprocessing import MinMaxScaler
-import torchvision.transforms as transforms
+#import torchvision.transforms as transforms
 
 
-train_transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.RandomRotation(degrees = 180),
-    transforms.ToTensor()
-])
+# train_transform = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.RandomRotation(degrees = 180),
+#     transforms.ToTensor()
+# ])
 
 
 class MyDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, transform = train_transform, model_name = 'none'):                  
+    def __init__(self, imgs_dir, masks_dir,  model_name = 'none'):  # transform = train_transform,                
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.ids = [os.path.join(imgs_dir, x) for x in os.listdir(imgs_dir)]   # direction of images
         self.msk_ids = [os.path.join(masks_dir, x) for x in os.listdir(masks_dir)]
-        self.transf = transform
+        # self.transf = transform
         self.model_name = model_name
 
     def __len__(self): # number of images
@@ -53,6 +53,18 @@ class MyDataset(Dataset):
         elif self.model_name == 'pop_01_20_1y':
             img = np.load(self.ids[index])[0:18,1:,:,:] # 2001-2018, 1y interval
             mask = np.load(self.msk_ids[index])[1:19,:,:] # 2002-2019, 1y interval
+            
+        elif self.model_name == 'pop_01_20_4y_LSTM':
+            img = np.load(self.ids[index])[[0,3,7,11],1:,:,:] # 2001-2018, 1y interval
+            mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:] # 2002-2019, 1y interval
+            
+        elif self.model_name == 'pop_only_01_20_1y':
+            img = np.load(self.ids[index])[0:18,1,:,:] # 2001-2018, 1y interval
+            mask = np.load(self.msk_ids[index])[1:19,:,:] # 2002-2019, 1y interval
+            
+        elif self.model_name == 'pop_only_01_20_4y':
+            img = np.load(self.ids[index])[[0,3,7,11],1,:,:] # 2001-2018, 1y interval
+            mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:] # 2002-2019, 1y interval
             
         
         # if self.transf is not None: # create random augmentation -> random subimage
@@ -96,19 +108,19 @@ class MyDataset(Dataset):
 
 
 
-def min_max_scale(img): # (b,t,c,w,h)
-    device = 'cpu'
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    data_new = np.zeros(img.shape)
-    data_new[:,:,0,:,:] = img[:,:,0,:,:]
+# def min_max_scale(img): # (b,t,c,w,h)
+#     device = 'cpu'
+#     scaler = MinMaxScaler(feature_range=(0, 1))
+#     data_new = np.zeros(img.shape)
+#     data_new[:,:,0,:,:] = img[:,:,0,:,:]
 
-    for i in range(1,img.shape[2]):
-        temp = img[:,:,i,:,:].reshape(-1,1)
-        scaler.fit(temp)
-        new_data = scaler.transform(temp)
-        new_data = new_data.reshape(img.shape[0], img.shape[1], img.shape[-2], img.shape[-1])
-        data_new[:,:,i,:,:] = new_data
+#     for i in range(1,img.shape[2]):
+#         temp = img[:,:,i,:,:].reshape(-1,1)
+#         scaler.fit(temp)
+#         new_data = scaler.transform(temp)
+#         new_data = new_data.reshape(img.shape[0], img.shape[1], img.shape[-2], img.shape[-1])
+#         data_new[:,:,i,:,:] = new_data
 
-    return torch.from_numpy(np.float32(data_new)).to(device)
+#     return torch.from_numpy(np.float32(data_new)).to(device)
 
 

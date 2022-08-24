@@ -31,7 +31,7 @@ config = {
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001]
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : 'pop_02-20_3y',
+        "model_n" : 'linear_regression_01-16_',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,
@@ -42,18 +42,30 @@ config = {
 
 ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm.npy"
 ori_data = np.load(ori_data_dir)
-pop = ori_data[:,1,:,:]
+
+
+### just pop as input for regression
+pop = ori_data[:,1,:,:] # all years
 pop = pop.reshape(pop.shape[0],-1)
 print(pop.shape)
+p = pop.transpose(1,0)
+print(p.shape)
 
-subset = pop[:,pop[0,:] > 0]
-p75 = np.percentile(subset, 99)
-subset = subset[:,subset[0,:] > p75]
+### multivariate linear regression
+# dat = ori_data[:,1:,:,:] # all years, all factors except multiclass layer
+# dat = dat.reshape(dat.shape[0], dat.shape[1], -1)
+# p = dat.transpose(2,0,1)
+# print(p.shape)
 
-pixel = subset[:,:]
-pixel = np.insert(pixel, 0, range(20), axis = 1)
-train = pixel[0:17, :]
-test = pixel[16:20, :]
+
+# subset = pop[:,pop[0,:] > 0]
+# p75 = np.percentile(subset, 99)
+# subset = subset[:,subset[0,:] > p75]
+
+# pixel = subset[:,:]
+# pixel = np.insert(pixel, 0, range(20), axis = 1)
+# train = pixel[0:17, :]
+# test = pixel[16:20, :]
 
 
 
@@ -61,11 +73,9 @@ test = pixel[16:20, :]
 ###############################################################################
 # linear regression per pixel
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-
-p = pop.transpose(1,0)
-print(p.shape)
 
 rmse_list = []
 pred_img_1D = np.zeros((p.shape[0]))
@@ -73,23 +83,49 @@ pred_img_1D = np.zeros((p.shape[0]))
 
 # loop through pixels
 for i in tqdm(range(0, p.shape[0])):
-    one = p[i,:19]
-    y = one.reshape(-1,1)
-    X = np.arange(19).reshape(-1,1)
+    one = p[i,:16]
+    y = one#.reshape(-1,1)
+    X = np.arange(16).reshape(-1,1)
+    #X = one[:,1:]
+    #Xnew = np.append(X, Xyears, axis = 1)
     # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+    
+    ##### linear regression
     reg = LinearRegression()
     reg.fit(X, y)
-    
-    
     interc = reg.intercept_
     coef = reg.coef_
     
     # make predictions:
-    def calc(slope, intercept, time):
-        return slope*time+intercept
+    def calc(slope, intercept, year):
+        return slope*year+intercept
     
     score = calc(coef, interc, 20)
     pred_img_1D[i] = score # save prediction for 2020
+    
+    
+    
+    
+    # ###### polynomial regression
+    # poly = PolynomialFeatures(degree=2, include_bias = False)
+    # X_poly = poly.fit_transform(X) # x.reshape(-1,1)
+    # # poly.fit(X_poly, y)
+    # poly_reg = LinearRegression()
+    # poly_reg.fit(X_poly, y)
+    
+    # y_predicted = poly_reg.predict(X_poly)
+    
+    # interc = poly_reg.intercept_
+    # coef = poly_reg.coef_
+    
+    # # make predictions:
+    # def calc2d(coef, intercept, year):
+    #     return coef[0]*year + coef[1]*year**2 + intercept
+    
+    # score = calc2d(coef, interc, 20)
+    # pred_img_1D[i] = score # save prediction for 2020
+    
+    
     
     # y_pred = reg.predict(X_test) # predict all to get error measures
     
@@ -100,7 +136,7 @@ for i in tqdm(range(0, p.shape[0])):
     # rmse_list.append(rmse)
 
 
-rmse = mean_squared_error(p[:,19], pred_img_1D, squared = False)
+rmse = mean_squared_error(p[:,-1], pred_img_1D, squared = False)
 #rmse_mean = statistics.mean(rmse_list)
 pred_img = pred_img_1D.reshape(888,888)
 
@@ -121,7 +157,7 @@ pred_img_rescaled = scaler.inverse_transform(pred_img.reshape(-1,1)).reshape(pre
 
 
 
-save_path = proj_dir + "data/test/linear_regression/"
+save_path = proj_dir + "data/test/" + config['model_n'] + "/"
 os.makedirs(save_path, exist_ok=True)
 np.save(save_path + 'pred_msk_eval_normed.npy', pred_img)
 np.save(save_path + 'pred_msk_eval_rescaled.npy', pred_img_rescaled)
@@ -235,6 +271,5 @@ tifffile.imwrite(save_path + 'pred_msk_rescaled.tif', pred_img_rescaled)
 # plot_pacf(df.diff(), ax=axes[1], lags = 9)
 
 # plt.show()
-
 
 
