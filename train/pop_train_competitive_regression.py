@@ -31,7 +31,7 @@ config = {
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001]
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : '2D_linear_regression_02-16',
+        "model_n" : 'comp_regression_lin_2d_3d_01-16',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,
@@ -79,7 +79,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 import math
 
 rmse_list = []
-pred_img_1D = np.zeros((p.shape[0]))
+pred_img_1D = np.zeros((p.shape[0], 2))
 
 
 # loop through pixels
@@ -91,19 +91,19 @@ for i in tqdm(range(0, p.shape[0])):
     #Xnew = np.append(X, Xyears, axis = 1)
     # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
     
-    # ##### linear regression
-    # reg = LinearRegression()
-    # reg.fit(X, y)
-    # interc = reg.intercept_
-    # coef = reg.coef_
+    ##### linear regression
+    reg = LinearRegression()
+    reg.fit(X, y)
+    interc_lin = reg.intercept_
+    coef_lin = reg.coef_
+      
+    # make predictions:
+    def calc(slope, intercept, year):
+        return slope*year+intercept
     
-    # # make predictions:
-    # def calc(slope, intercept, year):
-    #     return slope*year+intercept
+    score_lin = calc(coef_lin, interc_lin, X.squeeze())
     
-    # score = calc(coef, interc, 20)
-    # pred_img_1D[i] = score # save prediction for 2020
-    
+    rmse_lin = mean_squared_error(p[i,:16], score_lin, squared = False)
     
     
     
@@ -114,17 +114,54 @@ for i in tqdm(range(0, p.shape[0])):
     poly_reg = LinearRegression()
     poly_reg.fit(X_poly, y)
     
-    y_predicted = poly_reg.predict(X_poly)
+    # y_predicted = poly_reg.predict(X_poly)
     
-    interc = poly_reg.intercept_
-    coef = poly_reg.coef_
+    interc_2d = poly_reg.intercept_
+    coef_2d = poly_reg.coef_
+    
     
     # make predictions:
     def calc2d(coef, intercept, year):
         return coef[0]*year + coef[1]*year**2 + intercept
     
-    score = calc2d(coef, interc, 20)
-    pred_img_1D[i] = score # save prediction for 2020
+    score_2d = calc2d(coef_2d, interc_2d, X.squeeze())
+    
+    rmse_2d = mean_squared_error(p[i,:16], score_2d, squared = False)
+    
+    
+    ###### polynomial regression
+    poly = PolynomialFeatures(degree=3, include_bias = False)
+    X_poly = poly.fit_transform(X) # x.reshape(-1,1)
+    # poly.fit(X_poly, y)
+    poly_reg = LinearRegression()
+    poly_reg.fit(X_poly, y)
+    
+    # y_predicted = poly_reg.predict(X_poly)
+    
+    interc_3d = poly_reg.intercept_
+    coef_3d = poly_reg.coef_
+    
+    
+    # make predictions:
+    def calc3d(coef, intercept, year):
+        return coef[0]*year + coef[1]*year**2 + coef[2]*year**3 + intercept
+    
+    score_3d = calc3d(coef_3d, interc_3d, X.squeeze())
+    
+    rmse_3d = mean_squared_error(p[i,:16], score_3d, squared = False)
+    
+    
+    if (rmse_lin <= rmse_2d) and (rmse_lin <= rmse_3d): # save prediction of 2020 from best model according to rmse
+        score = calc(coef_lin, interc_lin, 20)
+        pred_img_1D[i,1] = 1
+    elif (rmse_2d < rmse_lin) and (rmse_2d < rmse_3d) :
+        score = calc2d(coef_2d, interc_2d, 20)
+        pred_img_1D[i,1] = 2
+    elif (rmse_3d < rmse_lin) and (rmse_3d < rmse_2d):
+        score = calc3d(coef_3d, interc_3d, 20)
+        pred_img_1D[i,1] = 3
+    
+    pred_img_1D[i,0] = score
     
     
     
@@ -157,12 +194,13 @@ for i in tqdm(range(0, p.shape[0])):
 
 # gt = p[~np.isnan(pred_img_1D), -1]
 # pred = pred_img_1D[~np.isnan(pred_img_1D)]
-rmse = mean_squared_error(p[:,-1], pred_img_1D, squared = False)
+rmse = mean_squared_error(p[:,-1], pred_img_1D[:,0], squared = False)
 #rmse_mean = statistics.mean(rmse_list)
-pred_img = pred_img_1D.reshape(888,888)
+pred_img = pred_img_1D.reshape(888,888,2)
 
-plt.imshow(pred_img)
+plt.imshow(pred_img[:,:,1])
 plt.title('prediction of 2020')
+plt.colorbar()
 plt.show()
 
 print('rmse '+ str(rmse))
@@ -174,7 +212,7 @@ ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_20y_4c_no_na
 pop_unnormed = ori_unnormed[:, 1, :, :]
 scaler = MinMaxScaler(feature_range=(0, 1))
 scaler.fit(pop_unnormed.reshape(-1, 1))
-pred_img_rescaled = scaler.inverse_transform(pred_img.reshape(-1,1)).reshape(pred_img.shape[-2], pred_img.shape[-1])
+pred_img_rescaled = scaler.inverse_transform(pred_img[:,:,0].reshape(-1,1)).reshape(pred_img.shape[0], pred_img.shape[1])
 
 
 

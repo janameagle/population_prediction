@@ -157,23 +157,32 @@ oh_crop_img = np.concatenate((crop_img_lulc[:,np.newaxis,:,:], lcnew_multitemp[:
 oh_crop_img = np.float32(oh_crop_img) # for smaller storage size
 
 
-
-
+#### set everything outsite lima region (with buffer) to 0 -> island will be removed
+oh_crop_img_buf = oh_crop_img
+lima_buf = np.load(proj_dir + 'data/ori_data/pop_pred/Lima_region_buffer_0_01dg.npy')
+for i in range(20):
+    pop = oh_crop_img_buf[i,1,:,:]
+    pop[lima_buf == 0] = 0
+    oh_crop_img_buf[i,1,:,:] = pop
 
 # normalize values
 # lc_multitemp = min_max_scale(lc_multitemp)
 # save stacked multitemporal image as numpy data
-np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh.npy', oh_crop_img)
+# np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh.npy', oh_crop_img)
+np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_buf.npy', oh_crop_img_buf)
 
 
 
 # slice the input data image
-full_image = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh.npy')
+# full_image = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh.npy')
+full_image = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_buf.npy')
+
 # full_image = lcnew_multitemp
 full_image = min_max_scale(full_image)
 # pop_unnormed = full_image[:,1,:,:]
 # full_image = np.concatenate((pop_unnormed[:,np.newaxis,:,:], full_image_norm), axis = 1) # t, c, w, h. Channels: pop unnormed, lc unnormed, pop normed, ...
-np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm.npy', full_image) # lc unnormed, pop normed, ...
+# np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm.npy', full_image) # lc unnormed, pop normed, ...
+np.save(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm_buf.npy', full_image) # lc unnormed, pop normed, ...
 h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]
 img_size = 256 # how big the tiles should be
@@ -201,13 +210,15 @@ for x, y in zip(new_x_list, new_y_list):
 print(len(sub_img_list))
 print(sub_img_list[1].shape)
 
-dir_input = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm/input/'
-dir_target = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm/target/'
+# dir_input = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm/input/'
+# dir_target = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm/target/'
+dir_input = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm_buf/input/'
+dir_target = proj_dir + 'data/train/pop_pred_' + str(n_years) +'y_' + str(n_classes) +'c_no_na_oh_norm_buf/target/'
 os.makedirs(dir_input, exist_ok=True)
 os.makedirs(dir_target, exist_ok=True)
 
 # save all sub images separately
-for i in range(len(sub_img_list)):
+for i in range(92, len(sub_img_list)):
     np.save(dir_input + str(i) + '_input.npy', sub_img_list[i][-6:,1:,:,:]) # all except lc not normed
     np.save(dir_target + str(i) + '_target.npy', sub_img_list[i][-6:,1,:,:]) # pop normed
 
