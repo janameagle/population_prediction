@@ -74,7 +74,7 @@ config = {
         "lr": 0.0012,
         "batch_size": 6,
         "epochs": 27, # 50
-        "model_n" : 'pop_only_01_20_4y'}
+        "model_n" : 'pop_only_01-20_4y'}
 
 
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm_buf.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     processed_ori_data = ori_data
@@ -95,12 +95,14 @@ if __name__ == '__main__':
     # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
     # valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
     # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
-    if config['model_n'] == 'pop_only_01_20_1y':
+    if config['model_n'] == 'pop_only_01-20_1y':
         valid_input = processed_ori_data[1:, 1, :, :] # years 2002-2020, 1y interval
         
-    elif config['model_n'] == 'pop_only_01_20_4y':
+    elif config['model_n'] == 'pop_only_01-20_4y':
         valid_input = processed_ori_data[[3,7,11,15,19], 1, :, :] # years 2002-2020, 1y interval
     
+        
+        
     
     gt = processed_ori_data[-1, 1, :, :] # last year, pop
     print('valid_sequence shape: ', valid_input.shape) # t,c,w,h; pop, ...
@@ -110,7 +112,7 @@ if __name__ == '__main__':
     df = pd.DataFrame()
     valid_record = {'mae': 0, 'rmse': 0}
 
-    dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
+    dir_checkpoint = proj_dir + "data/ckpts/{}_buf/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
     # "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
 
     print(dir_checkpoint)
@@ -163,7 +165,7 @@ if __name__ == '__main__':
     plt.imshow(pred_msk)
 
     # rescale to actual pop values
-    ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh.npy')
+    ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_buf.npy')
     pop_unnormed = ori_unnormed[:, 1, :, :]
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaler.fit(pop_unnormed.reshape(-1, 1))
@@ -172,7 +174,7 @@ if __name__ == '__main__':
 
 
 
-    save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+    save_path = proj_dir + "data/test/{}_buf/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
     # 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
 
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)

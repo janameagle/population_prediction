@@ -25,7 +25,9 @@ class ConvLSTMCell(nn.Module):
         self.hidden_dim = hidden_dim
 
         self.kernel_size = kernel_size
-        self.padding = kernel_size[0] // 2, kernel_size[1] // 2 # paddings adds a frame, so that image size stays the same after moving window
+        #self.padding = kernel_size[0] // 2, kernel_size[1] // 2 # paddings adds a frame, so that image size stays the same after moving window
+        self.padding = kernel_size // 2, kernel_size// 2 # paddings adds a frame, so that image size stays the same after moving window
+        
         self.bias = bias
 
         self.conv = nn.Conv2d(in_channels=self.input_dim + self.hidden_dim,
@@ -190,42 +192,136 @@ class ConvLSTM(nn.Module):
 ###############################################################################
 # Convolutional bidirectional LSTM
 
+# class ConvBLSTM(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, kernel_size, num_layers, 
+#                  batch_first=False, bias=True, return_all_layers=False):
+#         super(ConvBLSTM, self).__init__()
+    
+#         self.return_all_layers = return_all_layers
+        
+#         self.forward_cell = ConvLSTM(input_dim, hidden_dim, 
+#                                    kernel_size, num_layers, 
+#                                    batch_first=False, bias=True, return_all_layers=False)
+#         self.backward_cell = ConvLSTM(input_dim, hidden_dim, 
+#                                    kernel_size, num_layers, 
+#                                    batch_first=False, bias=True, return_all_layers=False)  
+
+
+#     def forward(self, x):
+#         y_out_forward = self.forward_cell(x)[0]
+#         x_reversed = torch.flip(x, [1])
+#         y_out_reverse = self.backward_cell(x_reversed)[0]
+#         output = torch.cat((y_out_forward, y_out_reverse), dim=2)
+#         if not self.return_all_layers:
+#             output = torch.squeeze(output[:, -1,...], dim=1)
+#         return output
+        
+   
 class ConvBLSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, kernel_size, num_layers, 
-                 batch_first=False, bias=True, return_all_layers=False):
+    def __init__(self, input_dim, hidden_dim, kernel_size, #num_layers, #img_size?
+                  batch_first=False, bias=True, return_all_layers=False):
         super(ConvBLSTM, self).__init__()
     
         self.return_all_layers = return_all_layers
+        self.batch_first = batch_first
         
-        self.forward_cell = ConvLSTM(input_dim, hidden_dim, 
-                                   kernel_size, num_layers, 
-                                   batch_first=False, bias=True, return_all_layers=False)
-        self.backward_cell = ConvLSTM(input_dim, hidden_dim, 
-                                   kernel_size, num_layers, 
-                                   batch_first=False, bias=True, return_all_layers=False)  
-
-
-    def forward(self, x):
-        y_out_forward = self.forward_cell(x)[0]
-        x_reversed = torch.flip(x, [1])
-        y_out_reverse = self.backward_cell(x_reversed)[0]
-        output = torch.cat((y_out_forward, y_out_reverse), dim=2)
-        if not self.return_all_layers:
-            output = torch.squeeze(output[:, -1,...], dim=1)
-        return output
+        self.cell_fw = ConvLSTMCell(input_dim=input_dim,
+                                      hidden_dim=hidden_dim,
+                                      kernel_size=kernel_size,
+                                      bias=bias)
         
-   
+        self.cell_bw = ConvLSTMCell(input_dim=input_dim,
+                                      hidden_dim=hidden_dim,
+                                      kernel_size=kernel_size,
+                                      bias=bias) 
+        
+        self.lstm = ConvLSTMCell(input_dim=hidden_dim*2,
+                    hidden_dim=1, # to create a regression output
+                    kernel_size=kernel_size,
+                    bias=bias)
+        
+
+    def forward(self, input_tensor, hidden_state=None):
+        if not self.batch_first: # change order if batch size is not first dimension
+            # (t, b, c, h, w) -> (b, t, c, h, w) # batch size, time, channel, height, width
+            input_tensor = input_tensor.permute(1, 0, 2, 3, 4)
+        b, seq_len, _, h, w = input_tensor.size()
+
+        # Implement stateful ConvLSTM
+        if hidden_state is not None:
+            raise NotImplementedError()
+        else:
+            # Since the init is done in forward. Can send image size here
+            hidden_state, hidden_state_inv = self._init_hidden(batch_size=b, image_size = (h,w))
+        
+        ## LSTM forward direction
+        h, c = hidden_state
+        output_inner = []
+        for t in range(seq_len):
+            h, c = self.cell_fw(input_tensor=input_tensor[:, t, :, :, :],
+                                             cur_state=[h, c])
+            
+            output_inner.append(h)
+        output_inner = torch.stack((output_inner), dim=1)
+        layer_output = output_inner
+        last_state = [h, c]
+        ####################
+
+        ## LSTM inverse direction
+        input_inv = input_tensor
+        h_inv, c_inv = hidden_state_inv
+        output_inv = []
+        for t in range(seq_len-1, -1, -1):
+            h_inv, c_inv = self.cell_bw(input_tensor=input_inv[:, t, :, :, :],
+                                             cur_state=[h_inv, c_inv])
+            
+            output_inv.append(h_inv)
+        output_inv.reverse() 
+        output_inv = torch.stack((output_inv), dim=1)
+        layer_output = torch.cat((output_inner, output_inv), dim=2)
+        last_state_inv = [h_inv, c_inv]
+    ###################################
+      
+        
+        ## standard LSTM layer
+        h, c = self._init_hidden_lstm(batch_size=b,image_size=(input_tensor.size(3), input_tensor.size(4)))
+        
+        output_lstm = []
+        for t in range(seq_len): # loop over time steps
+            h, c = self.lstm(input_tensor = layer_output[:,t,:,:,:],#?
+                             cur_state = [h, c])    
+            output_lstm.append(h)
     
+        total_output = torch.stack(output_lstm, dim=1)
+    
+        # if not self.return_all_layers:
+        #     layer_output_list = layer_output_list[-1:]
+        #     last_state_list = last_state_list[-1:]
+        
+        return total_output, [h,c]
+    
+        # return layer_output if self.return_all_layers is True else layer_output[:, -1:], last_state, last_state_inv
+
+
+    def _init_hidden(self, batch_size, image_size):
+            init_states_fw = self.cell_fw.init_hidden(batch_size, image_size)
+            init_states_bw = None
+            init_states_bw = self.cell_bw.init_hidden(batch_size, image_size)
+            return init_states_fw, init_states_bw
+
+    def _init_hidden_lstm(self, batch_size, image_size):
+        init_states = self.lstm.init_hidden(batch_size, image_size)
+        return init_states
    
-x1 = torch.randn([4, 10, 256, 256]) #(t, c, w, h)
-x2 = torch.randn([4, 10, 256, 256])
+# x1 = torch.randn([4, 10, 256, 256]) #(t, c, w, h)
+# x2 = torch.randn([4, 10, 256, 256])
 
-cblstm = ConvBLSTM(input_dim=10, hidden_dim=[32, 1], kernel_size=(3, 3), num_layers = 2)
+# cblstm = ConvBLSTM(input_dim=10, hidden_dim=[32, 1], kernel_size=(3, 3), num_layers = 2)
 
-x = torch.stack([x1, x2], dim=1)
-print(x.shape)
-out = cblstm(x)
-print (out.shape)
-out.sum().backward()    
+# x = torch.stack([x1, x2], dim=1)
+# print(x.shape)
+# out = cblstm(x)
+# print (out.shape)
+# out.sum().backward()    
 
 

@@ -20,13 +20,6 @@ proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
-def evaluate(gt, pred):
-    mae = metrics.mean_absolute_error(gt, pred)
-    rmse = metrics.mean_squared_error(gt, pred, squared = False)
-            
-    return mae, rmse
-
-
 def get_subsample_centroids(img, img_size=50):
     h_total = img.shape[-2]
     w_total = img.shape[-1]
@@ -44,14 +37,6 @@ def get_subsample_centroids(img, img_size=50):
             new_y_list.append(int(j))
     return new_x_list, new_y_list
 
-
-def color_annotation(image):
-    color = np.ones([image.shape[0], image.shape[1], 3])
-    color[image == 0] = [0, 102, 0]  # vegetation
-    color[image == 1] =  [0, 0, 255]  # urban
-    color[image == 2] = [128, 128, 128]  # barren
-    color[image == 3] = [255, 128, 0]  # water
-    return color
 
 
 def get_args():
@@ -73,8 +58,8 @@ config = {
         "l2": 'na',
         "lr": 0.0012,
         "batch_size": 6,
-        "epochs": 50,
-        "model_n" : 'pop_only_01-20_4y'}
+        "epochs": 41, # 50
+        "model_n" : 'pop_only_01_20_1y_frc22'}
 
 
 
@@ -89,59 +74,65 @@ if __name__ == '__main__':
 
     ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm.npy'
 
+    
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     processed_ori_data = ori_data
     #valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # 2004-2016, 4y interval, no lc unnormed
     # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
     # valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
     # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
-    if config['model_n'] == 'pop_01-20_4y':
-        valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # years 2004-2016, 4y interval
-    
-    elif config['model_n'] == 'pop_05-20_3y':
-        valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # years 2008-2017, 3y interval
-    
-    elif config['model_n'] == 'pop_10-20_2y':
-        valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # years 2012-2018, 2y interval
-    
-    elif config['model_n'] == 'pop_15-20_1y':
-        valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # years 2016-2019, 1y interval
+    if config['model_n'] == 'pop_only_01_20_1y':
+        valid_input = processed_ori_data[1:-1, 1, :, :] # years 2002-2020, 1y interval
         
-    elif config['model_n'] == 'pop_02-20_3y':
-        valid_input = processed_ori_data[[4,7,10,13,16], 1:, :, :] # years 2005-2017, 3y interval
+    elif config['model_n'] == 'pop_only_01_20_4y_frc24':
+        valid_input = processed_ori_data[[7,11,15,19], 1, :, :] # years 2008-2020, 4y interval
+        
+    elif config['model_n'] == 'pop_only_01_20_4y_frc28':
+        valid_input = processed_ori_data[[11,15,19], 1, :, :] # years 2008-2020, 4y interval
+        save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+        year24 = np.load(proj_dir + "data/test/pop_only_01_20_4y_frc24/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
+        valid_input = np.concatenate((valid_input, year24[np.newaxis,:,:]), axis=0)
+        
+    elif config['model_n'] == 'pop_only_01_20_4y_frc32':
+        valid_input = processed_ori_data[[15,19], 1, :, :] # years 2008-2020, 4y interval
+        year24 = np.load(proj_dir + "data/test/pop_only_01_20_4y_frc24/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
+        year28 = np.load(proj_dir + "data/test/pop_only_01_20_4y_frc28/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
+        valid_input = np.concatenate((valid_input, year24[np.newaxis,:,:], year28[np.newaxis,:,:]), axis=0)
+        
+    elif config['model_n'] == 'pop_only_01_20_1y_frc21':
+        valid_input = processed_ori_data[2:, 1, :, :] # years 2008-2020, 4y interval
+        
+    elif config['model_n'] == 'pop_only_01_20_1y_frc22':
+        valid_input = processed_ori_data[3:, 1, :, :] # years 2008-2020, 4y interval
+        save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+        year21 = np.load(proj_dir + "data/test/pop_only_01_20_1y_frc21/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
+        valid_input = np.concatenate((valid_input, year21[np.newaxis,:,:]), axis=0)
+        
+    elif config['model_n'] == 'pop_only_01_20_1y_frc23':
+        valid_input = processed_ori_data[4:, 1, :, :] # years 2008-2020, 4y interval
+        year21 = np.load(proj_dir + "data/test/pop_only_01_20_1y_frc21/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
+        year22 = np.load(proj_dir + "data/test/pop_only_01_20_1y_frc22/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
+        valid_input = np.concatenate((valid_input, year21[np.newaxis,:,:], year22[np.newaxis,:,:]), axis=0)
+        
     
-    elif config['model_n'] == 'pop_02-20_2y':
-        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17], 1:, :, :] # years 2004-2018, 2y interval
-    
-    elif config['model_n'] == 'pop_01_20_1y':
-        valid_input = processed_ori_data[1:19, 1:, :, :] # years 2002-2019, 1y interval
-    
-    
-    
-    gt = processed_ori_data[-1, 1, :, :] # last year, pop
-    print('valid_sequence shape: ', valid_input.shape) # t,c,w,h; pop, ...
-
-    input_channel = 10 # 19
+    input_channel = 1 # 19
 
     df = pd.DataFrame()
-    valid_record = {'mae': 0, 'rmse': 0}
 
-    dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
-    # "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
-
-    print(dir_checkpoint)
+    dir_checkpoint = proj_dir + "data/ckpts/pop_only_01_20_1y/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
+    
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
     sub_img_list = []
     for x, y in zip(x_list, y_list):
-        sub_img = valid_input[:, :, x - 128:x + 128, y - 128:y + 128]
+        sub_img = valid_input[:, x - 128:x + 128, y - 128:y + 128]
         sub_img_list.append(sub_img)
 
     pred_img_list = []
 
     with torch.no_grad():
         for test_img in tqdm(sub_img_list):
-
+            test_img = test_img[:, np.newaxis, :,:]
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
@@ -155,8 +146,9 @@ if __name__ == '__main__':
           
             output_list = net(test_img) # all factors but lc
 
-            masks_pred = output_list[0].squeeze().view(-1, 256, 256) # t, c, w, h
-            pred_img_list.append(masks_pred[-1,:,:].cpu().numpy())
+            pred_img = output_list[0].squeeze() # t, c, w, h
+            pred_img = pred_img[-1,:,:] # take last year prediction
+            pred_img_list.append(pred_img.cpu().numpy())
             
            
 
@@ -172,9 +164,6 @@ if __name__ == '__main__':
             pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
             h += 1
 
-    val_mae, val_rmse = evaluate(gt, pred_msk)
-    print('mae: ', val_mae)
-    print('rmse: ', val_rmse)
     plt.imshow(pred_msk)
 
     # rescale to actual pop values
@@ -185,16 +174,11 @@ if __name__ == '__main__':
     pop = scaler.inverse_transform(pred_msk.reshape(-1,1)).reshape(pred_msk.shape[-2], pred_msk.shape[-1])
     
 
-
-
     save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
-    # 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
 
-    # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
     np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
-    #cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
     plt.savefig(save_path + 'pred_msk_eval.png')
     
 

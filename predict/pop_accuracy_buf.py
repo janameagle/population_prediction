@@ -29,39 +29,56 @@ config = {
         "l2": 'na',
         "lr": 0.0012,
         "batch_size": 6, #1
-        "epochs": 41, # 50,
-        "model_n" : 'pop_only_01_20_1y',
+        "epochs": 50, # 50,
+        "model_n" : 'pop_02-20_3y_static_bu',
         "reg": False}
 
 # interval = int(config['model_n'][-2])
 # lastyear = 20 - interval
-interval = 4
-lastyear = 16
+interval = 1
+lastyear = 17
 
 if config['reg'] == True:
     save_path = proj_dir + 'data/test/{}/'.format(config['model_n'])
     pred_path = save_path + "pred_msk_eval_rescaled.npy"
 else: 
-    save_path = proj_dir + 'data/test/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+    save_path = proj_dir + 'data/test/{}_buf_bi/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
     pred_path =  save_path + "pred_msk_eval_rescaled.npy"
 
-gt_path = proj_dir + 'data/ori_data/pop_pred/input_all_{}y_{}c_no_na_oh.npy'.format(n_years, n_classes)
+gt_path = proj_dir + 'data/ori_data/pop_pred/input_all_{}y_{}c_no_na_oh_buf.npy'.format(n_years, n_classes)
 
 
 pred = np.load(pred_path)
 gt = np.load(gt_path)
 
 
+
+
 # differences between pred and gt
 pop = gt[:,1,:,:]
+
+#### set everything outsite lima region (with buffer) to 0 -> island will be removed
+lima_buf = np.load(proj_dir + 'data/ori_data/pop_pred/Lima_region.npy')
+pred[lima_buf == 0] = 0
+#pred[pred < 0] = 0
+# for i in range(20): # not needed bc input data is clipped without buffer?
+#     pop_temp = pop[i,:,:]
+#     pop_temp[lima_buf == 0] = 0
+#     pop[i,:,:] = pop_temp
+
+
+    
+    
 poplast = pop[lastyear-1,:,:]
 pop20 = pop[-1,:,:]
+
+
 
 difflastpred = pred - poplast
 diff20pred = pred - pop20
 
-plt.imshow(pred)
-plt.colorbar()
+# plt.imshow(pred)
+# plt.colorbar()
 
 
 # define colormaps
@@ -128,7 +145,7 @@ def spatial_plot(poplast, pop20, difflastpred, diff20pred, pred):
     
     
     # finally save to file
-    plt.savefig(save_path + 'spatial_pred_check.png')
+    plt.savefig(save_path + 'spatial_pred_check_buf.png')
     
     
     # save subplots
@@ -136,20 +153,20 @@ def spatial_plot(poplast, pop20, difflastpred, diff20pred, pred):
     plt.imshow(difflastpred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
     plt.title("Model: {} | Diff pred - 20{}".format(config['model_n'], str(lastyear)))
     plt.colorbar(location = 'right')
-    difflast.savefig(save_path + 'spatial_pred_check_20' + str(lastyear) + '.png')
+    difflast.savefig(save_path + 'spatial_pred_check_20' + str(lastyear) + '_buf.png')
     
     
     diff20 = plt.figure(figsize = (20,16))
     plt.imshow(diff20pred[100:750, 0:750], cmap = diffcmap, vmin = -40, vmax = 40)
     plt.title("Model: {} | Diff pred - 2020".format(config['model_n']))
     plt.colorbar(location = 'right')
-    diff20.savefig(save_path + 'spatial_pred_check_2020.png')
+    diff20.savefig(save_path + 'spatial_pred_check_2020_buf.png')
 
     pred20 = plt.figure(figsize = (20,16))
     plt.imshow(pred[100:750, 0:750], cmap = popcmap, vmin = 0, vmax = 300)
     plt.title("Prediction of 2020")
     plt.colorbar(location = 'right')
-    pred20.savefig(save_path + 'prediction_2020.png')
+    pred20.savefig(save_path + 'prediction_2020_buf.png')
 
 
 
@@ -158,28 +175,15 @@ def spatial_plot(poplast, pop20, difflastpred, diff20pred, pred):
 ###############################################################################
 
 def scatter_plot(pop20, pred):
-    # plt change style
-    #plt.style.use('seaborn')
-    
     
     #calculate equation for trendline
     z = np.polyfit(pop20.flatten(), pred.flatten(), 1)
     p = np.poly1d(z)
     
-    # # scatterplot with trendline
-    # plt.scatter(pop20, pred, c = abs(pred - pop20), cmap = popcmap)
-    # plt.title('Scatterplot prediction and ground truth')
-    # plt.xlabel('Prediction of 2020')
-    # plt.ylabel('Ground truth of 2020')
-    # plt.colorbar().set_label('Population')
-    # plt.plot(pred, pred, color = 'blue', linewidth = 0.2)
-    
-    
-####### remove island and water
-    # pred[pop20 == 0] = 0
-    # pred[pred < 0] = 0
-    # pred = pred[100:700,190:700]
-    # pop20 = pop20[100:700,190:700]
+
+####### crop image
+    # pred = pred[:, 700:] #190:700]
+    # pop20 = pop20[:, 700:] #190:700]
    
 
     # calculate metrics
@@ -197,7 +201,8 @@ def scatter_plot(pop20, pred):
     ###########################################################
     # pretty scatter plot
     fig, ax = plt.subplots(figsize = (10,7))
-    plot = ax.scatter(pop20, pred, c = abs(pred - pop20), cmap = 'YlOrRd', vmin = 0, vmax = 300)
+    plot = ax.scatter(pop20, pred, c = abs(pred - pop20), cmap = 'YlOrRd', vmin = 0, vmax = 80)
+    # plot = ax.scatter(pop20, pred, color = 'Red', alpha = 0.001)
     plt.plot(pop20, p(pop20), color = 'blue', linewidth = 0.02)
     
     # remove box around plot and ticks
@@ -231,22 +236,12 @@ def scatter_plot(pop20, pred):
     fig.tight_layout()
     
     # finally save to file
-    plt.savefig(save_path + 'scatter_pred_check.png')
+    plt.savefig(save_path + 'scatter_pred_check_buf.png')
     # plt.savefig(save_path + 'scatter_pred_check_trimmed.png')
     
     
-    errors_df.to_csv(save_path + 'error_measures.csv')
+    errors_df.to_csv(save_path + 'error_measures_buf.csv')
     # errors_df.to_csv(save_path + 'error_measures_trimmed.csv')
-
-
-# # seaborn
-
-
-# sns.scatterplot(pred.flatten(), pop20.flatten(), hue = pred.flatten() - pop20.flatten(), palette = popcmap)
-# plt.title('test')
-# plt.xlabel('xaxis')
-
-
 
 
 # import tifffile
@@ -260,16 +255,32 @@ def scatter_plot(pop20, pred):
 # do the plotting
 ###############################################################################
 
-spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
+# spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
 
 scatter_plot(pop20, pred)
 
 
-# pred_b = pred
+# pred_clean = pred.copy()
+# pred_clean[pop20 == 0] = 0
+
+# pred_b = pred.copy()
 # pred_b[pred < 0] = -1
 # pred_b[pred == 0] = 0
 # pred_b[pred > 0] = 1
+# plt.imshow(pred_b)
+# plt.colorbar(location = 'right')
 
+# pred_b = pred.copy()
+# pred_b[(pop20 == 0) & (pred > 0)] = 1
+# pred_b[(pop20 == 0) & (pred == 0)] = 0
+# pred_b[pred < 0] = -1
+# pred_b[pop20 > 0] = 2
+# plt.imshow(pred_b)
+# plt.colorbar(location = 'right')
+
+
+# pred_b = np.zeros((pred.shape[0], pred.shape[1]))
+# pred_b[(pop20 == 0) & (pred > 0)] = 1
 # plt.imshow(pred_b)
 # plt.colorbar(location = 'right')
 
@@ -294,3 +305,10 @@ scatter_plot(pop20, pred)
 # negative = np.zeros((pred.shape[0], pred.shape[1]))
 # negative[pred<0] = 1
 # plt.imshow(negative)
+
+# plt.imshow(check[300:400, :])
+# plt.colorbar()
+# plt.show()
+
+# plt.scatter(pop20[320:350,770:820], pred[320:350,770:820])
+# plt.scatter(pop20[320:350,800:850], pred[320:350,800:850])

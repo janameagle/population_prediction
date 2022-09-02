@@ -6,6 +6,7 @@ Created on Thu Jun 23 12:42:32 2022
 """
 
 
+from model.bi_convlstm import ConvBLSTM
 from model.v_convlstm import ConvLSTM
 import os
 import torch
@@ -194,9 +195,9 @@ def train_ConvGRU(config):
 
     
     
-    net = ConvLSTM(input_dim = input_channel,
-                   hidden_dim=[config['l1'], 1], #args.n_features], 
-                   kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
+    net = ConvBLSTM(input_dim = input_channel,
+                   hidden_dim=config['l1'], #args.n_features], 
+                   kernel_size=3, # num_layers=args.n_layer,
                    batch_first=True, bias=bias_status, return_all_layers=False)
     net.to(device)
     
@@ -225,7 +226,7 @@ def train_ConvGRU(config):
             # true_masks = true_masks[:,-5:-1,:,:].to(device, dtype=torch.float32) # (b, t, w, h)
             true_masks = true_masks.to(device, dtype=torch.float32) # (b, t, w, h)
             
-            output_list = net(imgs) # all factors but lc, 4 years
+            output_list = net(imgs) # all factors but lc, 4 years, output: layer_output[:, -1:], last_state, last_state_inv
 
             masks_pred = output_list[0].squeeze() # (b, t, w, h)
             masks_pred = masks_pred[:,-1,:,:]
@@ -293,7 +294,7 @@ def train_ConvGRU(config):
 
 
         if config["save_cp"]:
-            dir_checkpoint = proj_dir + "data/ckpts/{}_buf/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+            dir_checkpoint = proj_dir + "data/ckpts/{}_buf_bi/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
                         dir_checkpoint + f'CP_epoch{epoch}.pth')
@@ -303,7 +304,7 @@ def train_ConvGRU(config):
             train_record.update(val_record)
             record_df = pd.DataFrame(train_record, index=[epoch])
             df = df.append(record_df)
-            record_dir = proj_dir + 'data/record/{}_buf/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+            record_dir = proj_dir + 'data/record/{}_buf_bi/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(record_dir, exist_ok=True)
             df.to_csv(record_dir + '{}_lr{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], config["batch_size"], config["l1"], config["l2"]))
 
@@ -335,7 +336,7 @@ config = {
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001] #  # 
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : 'pop_01-20_4y_static',
+        "model_n" : 'pop_02-20_3y_static',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,
@@ -348,14 +349,12 @@ config = {
 print(config)
 
 
-
 # run with current set of random hyperparameters
 import time
 starttime = time.time()
 train_ConvGRU(config)
 time1 = time.time() - starttime
 print(str(time1/3600) + ' h')
-
 
 
 # config['model_n'] = 'pop_15-20_1y'

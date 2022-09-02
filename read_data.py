@@ -158,12 +158,16 @@ oh_crop_img = np.float32(oh_crop_img) # for smaller storage size
 
 
 #### set everything outsite lima region (with buffer) to 0 -> island will be removed
-oh_crop_img_buf = oh_crop_img
-lima_buf = np.load(proj_dir + 'data/ori_data/pop_pred/Lima_region_buffer_0_01dg.npy')
+oh_crop_img_buf = oh_crop_img.copy()
+lima_buf = np.load(proj_dir + 'data/ori_data/pop_pred/Lima_region.npy')
 for i in range(20):
+    print(i)
     pop = oh_crop_img_buf[i,1,:,:]
     pop[lima_buf == 0] = 0
     oh_crop_img_buf[i,1,:,:] = pop
+    
+    
+    
 
 # normalize values
 # lc_multitemp = min_max_scale(lc_multitemp)
@@ -218,9 +222,9 @@ os.makedirs(dir_input, exist_ok=True)
 os.makedirs(dir_target, exist_ok=True)
 
 # save all sub images separately
-for i in range(92, len(sub_img_list)):
-    np.save(dir_input + str(i) + '_input.npy', sub_img_list[i][-6:,1:,:,:]) # all except lc not normed
-    np.save(dir_target + str(i) + '_target.npy', sub_img_list[i][-6:,1,:,:]) # pop normed
+for i in range(len(sub_img_list)):
+    np.save(dir_input + str(i) + '_input.npy', sub_img_list[i][:,1:,:,:]) # all except lc not normed
+    np.save(dir_target + str(i) + '_target.npy', sub_img_list[i][:,1,:,:]) # pop normed
 
 
 

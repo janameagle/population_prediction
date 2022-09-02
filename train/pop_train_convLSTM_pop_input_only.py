@@ -31,14 +31,11 @@ from sklearn import metrics
 import csv
 
 
-print("initial usage")
-gpu_usage()
 
 proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# device = 'cpu'
 
 
 def evaluate(gt, pred):
@@ -92,14 +89,14 @@ def get_valid_dataset(ori_data_dir, model_name):
     elif model_name == 'pop_02-20_2y':
         valid_input = processed_ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
     
-    elif model_name == 'pop_01_20_1y':
+    elif model_name == 'pop_01-20_1y':
         valid_input = processed_ori_data[1:, :, :, :] # years 2002-2020, 1y interval
 
-    elif model_name == 'pop_only_01_20_1y':
+    elif model_name == 'pop_only_01-20_1y':
         valid_input = processed_ori_data[1:, 1, :, :] # years 2002-2020, 1y interval
         
-    elif model_name == 'pop_only_01_20_4y':
-        valid_input = processed_ori_data[[3,7,11,15,19], 1, :, :] # years 2002-2020, 1y interval
+    elif model_name == 'pop_only_01-20_4y':
+        valid_input = processed_ori_data[[3,7,11,15,19], 1, :, :] # years 2004-2020, 1y interval
     
         
     
@@ -121,7 +118,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
-            output_list = net(test_img[:, :, :, :, :]) # pop only, except last year
+            output_list = net(test_img[:, :, :, :, :]) 
 
             pred_img = output_list[0].squeeze()
             # lin = nn.Linear(1,1)
@@ -185,11 +182,11 @@ pred_sequence = 'forward'
 def train_ConvGRU(config):
     liveloss = PlotLosses()
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
-    train_dir = dataset_dir + "train/pop_pred_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm/"
+    train_dir = dataset_dir + "train/pop_pred_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm_buf/"
     train_data = MyDataset(imgs_dir = train_dir + 'input/', masks_dir = train_dir +'target/', model_name = config['model_n'])
     train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
     
-    ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm.npy"
+    ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm_buf.npy"
     valid_input, gt = get_valid_dataset(ori_data_dir, model_name = config['model_n'])
     
     
@@ -293,7 +290,7 @@ def train_ConvGRU(config):
 
 
         if config["save_cp"]:
-            dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+            dir_checkpoint = proj_dir + "data/ckpts/{}_buf/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
                        dir_checkpoint + f'CP_epoch{epoch}.pth')
@@ -303,7 +300,7 @@ def train_ConvGRU(config):
             train_record.update(val_record)
             record_df = pd.DataFrame(train_record, index=[epoch])
             df = df.append(record_df)
-            record_dir = proj_dir + 'data/record/{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+            record_dir = proj_dir + 'data/record/{}_buf/lr{}_bs{}_1l{}_2l{}/'.format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(record_dir, exist_ok=True)
             df.to_csv(record_dir + '{}_lr{}_bs{}_1l{}_2l{}.csv'.format(config["model_n"],config["lr"], config["batch_size"], config["l1"], config["l2"]))
 
@@ -322,20 +319,16 @@ def train_ConvGRU(config):
             break
 
 
-        
-print("usage before main")
-gpu_usage()
-
 
 
 # define random choice of hyperparameters
 config = {
-        "l1": 64, # 2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
-        "l2": 'na', # 2 ** np.random.randint(2, 8),
-        "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001]
+        "l1": 64, # 2 ** np.random.randint(2, 8), # 64, # # [4, 8, 16, 32, 64, 128, 256]
+        "l2": 'na', #2 ** np.random.randint(2, 8), #'na', # 
+        "lr": 0.0012, #round(np.random.uniform(0.01, 0.00001), 4), # 0.0012, #  [0.1, 0.00001]
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : 'pop_only_01_20_4y',
+        "model_n" : 'pop_only_01-20_4y',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,

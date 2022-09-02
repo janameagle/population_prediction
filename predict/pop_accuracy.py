@@ -30,8 +30,8 @@ config = {
         "lr": 0.0012,
         "batch_size": 6, #1
         "epochs": 41, # 50,
-        "model_n" : 'pop_only_01_20_1y',
-        "reg": False}
+        "model_n" : 'comp_regression_lin_2d_01-16',
+        "reg": True}
 
 # interval = int(config['model_n'][-2])
 # lastyear = 20 - interval
@@ -197,7 +197,7 @@ def scatter_plot(pop20, pred):
     ###########################################################
     # pretty scatter plot
     fig, ax = plt.subplots(figsize = (10,7))
-    plot = ax.scatter(pop20, pred, c = abs(pred - pop20), cmap = 'YlOrRd', vmin = 0, vmax = 300)
+    plot = ax.scatter(pop20, pred, c = abs(pred - pop20), cmap = 'YlOrRd', vmin = 0, vmax = 80)
     plt.plot(pop20, p(pop20), color = 'blue', linewidth = 0.02)
     
     # remove box around plot and ticks
@@ -260,7 +260,7 @@ def scatter_plot(pop20, pred):
 # do the plotting
 ###############################################################################
 
-spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
+#spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
 
 scatter_plot(pop20, pred)
 

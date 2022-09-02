@@ -8,7 +8,7 @@ import cv2
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
-from model.v_convlstm import ConvLSTM
+from model.v_lstm import MV_LSTM
 from sklearn.preprocessing import MinMaxScaler
 import torch.nn as nn
 from sklearn import metrics
@@ -72,9 +72,9 @@ config = {
         "l1": 64,
         "l2": 'na',
         "lr": 0.0012,
-        "batch_size": 6,
+        "batch_size": 1,
         "epochs": 50,
-        "model_n" : 'pop_only_01-20_4y'}
+        "model_n" : 'pop_02-20_3y_static_LSTM'}
 
 
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm_buf.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     processed_ori_data = ori_data
@@ -95,38 +95,24 @@ if __name__ == '__main__':
     # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
     # valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
     # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
-    if config['model_n'] == 'pop_01-20_4y':
+    if config['model_n'] == 'pop_01_20_4y_LSTM':
         valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # years 2004-2016, 4y interval
     
-    elif config['model_n'] == 'pop_05-20_3y':
-        valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # years 2008-2017, 3y interval
-    
-    elif config['model_n'] == 'pop_10-20_2y':
-        valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # years 2012-2018, 2y interval
-    
-    elif config['model_n'] == 'pop_15-20_1y':
-        valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # years 2016-2019, 1y interval
-        
-    elif config['model_n'] == 'pop_02-20_3y':
-        valid_input = processed_ori_data[[4,7,10,13,16], 1:, :, :] # years 2005-2017, 3y interval
-    
-    elif config['model_n'] == 'pop_02-20_2y':
-        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17], 1:, :, :] # years 2004-2018, 2y interval
-    
-    elif config['model_n'] == 'pop_01_20_1y':
-        valid_input = processed_ori_data[1:19, 1:, :, :] # years 2002-2019, 1y interval
-    
-    
+    elif config['model_n'] == 'pop_02-20_3y_static_LSTM':
+         valid_input = processed_ori_data[[4,7,10,13,16], :, :, :] # years 2005-2020, 3y interval   
+         valid_input = valid_input[:,[1,3,4,5,6],:,:]
+         
+
     
     gt = processed_ori_data[-1, 1, :, :] # last year, pop
     print('valid_sequence shape: ', valid_input.shape) # t,c,w,h; pop, ...
 
-    input_channel = 10 # 19
+    input_channel = 5 #10 # 19
 
     df = pd.DataFrame()
     valid_record = {'mae': 0, 'rmse': 0}
 
-    dir_checkpoint = proj_dir + "data/ckpts/{}/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
+    dir_checkpoint = proj_dir + "data/ckpts/{}_buf/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
     # "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
 
     print(dir_checkpoint)
@@ -142,43 +128,48 @@ if __name__ == '__main__':
     with torch.no_grad():
         for test_img in tqdm(sub_img_list):
 
-            test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
-                                                                                   dtype=torch.float32)
+            test_img = test_img.reshape(test_img.shape[0], test_img.shape[1], test_img.shape[-2]*test_img.shape[-1]) # (t,c, w*h)
+            test_img = np.moveaxis(test_img, 2, 0) # (w*h, t, c)
+            test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)            
 
-            net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[64, 1], # args.n_features],
-                          kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
-                          batch_first=True, bias=bias_status, return_all_layers=False)
 
+            net = MV_LSTM(n_features = input_channel,
+                          seq_length = 5,
+                          hidden_dim = config['l1'],
+                          num_layers = 1,
+                          batch_first = True,
+                          bidirectional = False) # try true
+
+            net.init_hidden(test_img.shape[0])      
             net.to(device)
             net.load_state_dict(torch.load(dir_checkpoint))
-          
-            output_list = net(test_img) # all factors but lc
-
-            masks_pred = output_list[0].squeeze().view(-1, 256, 256) # t, c, w, h
-            pred_img_list.append(masks_pred[-1,:,:].cpu().numpy())
             
-           
+            pred_img = net(test_img[:, :, :]) # all except lc, except last year
 
+            pred_img = pred_img[:,0] # take last year prediction
+            pred_img_list.append(pred_img.cpu().numpy().reshape(256, 256))
+   
+    
     pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
 
     h = 0
+
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
     for x, y in zip(x_list, y_list):
         if x == np.min(x_list) or x == np.max(x_list) or y == np.min(y_list) or y == np.max(y_list):
             pred_msk[x - 128:x + 128, y - 128:y + 128] = pred_img_list[h]
             h += 1
         else:
-            pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
+            pred_msk[x - 106:x + 106, y - 106:y + 106] = pred_img_list[h][22:234,22:234]
             h += 1
 
-    val_mae, val_rmse = evaluate(gt, pred_msk)
-    print('mae: ', val_mae)
-    print('rmse: ', val_rmse)
+    val_rmse = evaluate(gt, pred_msk)
     plt.imshow(pred_msk)
+    print('rmse: ', val_rmse)
+
 
     # rescale to actual pop values
-    ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh.npy')
+    ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_buf.npy')
     pop_unnormed = ori_unnormed[:, 1, :, :]
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaler.fit(pop_unnormed.reshape(-1, 1))
@@ -187,7 +178,7 @@ if __name__ == '__main__':
 
 
 
-    save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+    save_path = proj_dir + "data/test/{}_buf/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
     # 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
 
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)

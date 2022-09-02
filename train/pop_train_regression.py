@@ -31,7 +31,7 @@ config = {
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001]
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : '2D_linear_regression_02-16',
+        "model_n" : 'linear_regression_01-16',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,
@@ -40,7 +40,7 @@ config = {
 
 
 
-ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm.npy"
+ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm_buf.npy"
 ori_data = np.load(ori_data_dir)
 
 
@@ -91,40 +91,40 @@ for i in tqdm(range(0, p.shape[0])):
     #Xnew = np.append(X, Xyears, axis = 1)
     # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
     
-    # ##### linear regression
-    # reg = LinearRegression()
-    # reg.fit(X, y)
-    # interc = reg.intercept_
-    # coef = reg.coef_
-    
-    # # make predictions:
-    # def calc(slope, intercept, year):
-    #     return slope*year+intercept
-    
-    # score = calc(coef, interc, 20)
-    # pred_img_1D[i] = score # save prediction for 2020
-    
-    
-    
-    
-    ###### polynomial regression
-    poly = PolynomialFeatures(degree=2, include_bias = False)
-    X_poly = poly.fit_transform(X) # x.reshape(-1,1)
-    # poly.fit(X_poly, y)
-    poly_reg = LinearRegression()
-    poly_reg.fit(X_poly, y)
-    
-    y_predicted = poly_reg.predict(X_poly)
-    
-    interc = poly_reg.intercept_
-    coef = poly_reg.coef_
+    ##### linear regression
+    reg = LinearRegression()
+    reg.fit(X, y)
+    interc = reg.intercept_
+    coef = reg.coef_
     
     # make predictions:
-    def calc2d(coef, intercept, year):
-        return coef[0]*year + coef[1]*year**2 + intercept
+    def calc(slope, intercept, year):
+        return slope*year+intercept
     
-    score = calc2d(coef, interc, 20)
+    score = calc(coef, interc, 20)
     pred_img_1D[i] = score # save prediction for 2020
+    
+    
+    
+    
+    # ###### polynomial regression
+    # poly = PolynomialFeatures(degree=2, include_bias = False)
+    # X_poly = poly.fit_transform(X) # x.reshape(-1,1)
+    # # poly.fit(X_poly, y)
+    # poly_reg = LinearRegression()
+    # poly_reg.fit(X_poly, y)
+    
+    # y_predicted = poly_reg.predict(X_poly)
+    
+    # interc = poly_reg.intercept_
+    # coef = poly_reg.coef_
+    
+    # # make predictions:
+    # def calc2d(coef, intercept, year):
+    #     return coef[0]*year + coef[1]*year**2 + intercept
+    
+    # score = calc2d(coef, interc, 20)
+    # pred_img_1D[i] = score # save prediction for 2020
     
     
     
@@ -170,7 +170,7 @@ print('rmse '+ str(rmse))
 
 
 # rescale to actual pop values
-ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_20y_4c_no_na_oh.npy')
+ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_20y_4c_no_na_oh_buf.npy')
 pop_unnormed = ori_unnormed[:, 1, :, :]
 scaler = MinMaxScaler(feature_range=(0, 1))
 scaler.fit(pop_unnormed.reshape(-1, 1))
@@ -178,7 +178,7 @@ pred_img_rescaled = scaler.inverse_transform(pred_img.reshape(-1,1)).reshape(pre
 
 
 
-save_path = proj_dir + "data/test/" + config['model_n'] + "/"
+save_path = proj_dir + "data/test/" + config['model_n'] + "_buf/"
 os.makedirs(save_path, exist_ok=True)
 np.save(save_path + 'pred_msk_eval_normed.npy', pred_img)
 np.save(save_path + 'pred_msk_eval_rescaled.npy', pred_img_rescaled)
