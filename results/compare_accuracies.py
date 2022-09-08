@@ -22,14 +22,17 @@ models = [#'pop_01-20_4y/' + params,
           #'pop_10-20_2y/' + params,
           #'pop_02-20_2y/' + params,
           'pop_02-20_3y_buf/' + params,
-          #'pop_01-20_4y_buf/' + params,
+          'pop_01-20_4y_buf/' + params,
           'pop_only_01-20_4y_buf/' + params,
           'pop_only_01_20_1y/' + params,
           #'pop_01_20_4y_LSTM/' + params,
           'pop_02-20_3y_static_buf/' + params,
           'pop_02-20_3y_static_buf_bi/' + params,
           'pop_02-20_3y_static_LSTM_buf/' + params,
-          'linear_regression_01-16_buf/']#,
+          'pop_01_20_4y_LSTM/' + params,
+          'linear_regression_01-16_buf/',
+          'multivariate_regression_02-17_3y_static/',
+          'random_forest_regression_02-17_3y_static/']#,
           #'comp_regression_lin_2d_01-16/',
           #'comp_regression_lin_2d_3d_01-16/']
 
@@ -49,9 +52,10 @@ for model in models:
     errors = errors.append(data)
 
 
-errors = errors.set_index('model_n')
-print(errors)
-print(errors['rmse'])
+errors = errors.drop(['ssim'], axis = 1)
+# errors = errors.set_index('model_n')
+# print(errors)
+# print(errors['rmse'])
 
 
 # ax1 = errors.plot.scatter(x='mae',
@@ -62,6 +66,8 @@ print(errors['rmse'])
 
 # plt.plot(errors)
 
+####################################
+# scatterplot
 
 errors.index.name = 'model_n'
 
@@ -79,5 +85,18 @@ import seaborn as sns
 fig,ax = plt.subplots()
 sns.scatterplot(data=errors, hue='model_n', x='ssim', y='rmse', palette= 'Set2', s=200) #'Spectral'
 plt.legend(loc=(1.04, 0))
-plt.xlim(0.8, 1)
 plt.show()
+
+
+####################################
+# barplot
+
+errors_m = errors.sort_values('mae', ascending=False)
+errors_m = errors_m.melt(id_vars='model_n', var_name= 'error', value_name = 'value')
+errors_m.loc[(errors_m.value < 0), 'value']= -1 
+ax = sns.barplot(data = errors_m, y = 'model_n', x = 'value', hue = 'error')
+
+
+
+
+

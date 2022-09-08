@@ -9,18 +9,24 @@ from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
 import pandas as pd
 from model.v_convlstm import ConvLSTM
-from utilis.dataset import min_max_scale
+from sklearn.preprocessing import MinMaxScaler
+import torch.nn as nn
+from sklearn import metrics
+import matplotlib.pyplot as plt
+
+from model.bi_convlstm import ConvBLSTM
+
 
 
 proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
-def evaluate(pred, gt):
-    k_statistics = cohen_kappa_score(gt.astype(np.int64).flatten(), pred.astype(np.int64).flatten())
-    acc_score = accuracy_score(gt.astype(np.int64).flatten(), pred.astype(np.int64).flatten())
-
-    return k_statistics,acc_score
+def evaluate(gt, pred):
+    mae = metrics.mean_absolute_error(gt, pred)
+    rmse = metrics.mean_squared_error(gt, pred, squared = False)
+            
+    return mae, rmse
 
 
 def get_subsample_centroids(img, img_size=50):
@@ -40,34 +46,6 @@ def get_subsample_centroids(img, img_size=50):
             new_y_list.append(int(j))
     return new_x_list, new_y_list
 
-
-def oh_code(a, class_n = 7):
-    oh_list = []
-    for i in range(class_n):
-        temp = np.where(a == i, 1, 0)
-        oh_list.append(temp)
-    return np.array(oh_list)
-
-def pre_prcessing(crop_img):
-    crop_img_lulc = crop_img[:, 0, :, :]
-    temp_list = []
-    for j in range(crop_img_lulc.shape[0]):
-        temp = oh_code(crop_img_lulc[j], class_n=7)
-        temp_list.append(temp[np.newaxis, :, :, :])
-    oh_crop_img_lulc = np.concatenate(temp_list, axis=0)
-    oh_crop_img = np.concatenate((oh_crop_img_lulc, crop_img[:, 1:, :, :]), axis=1)
-    return oh_crop_img
-
-# def color_annotation(image):
-#     color = np.ones([image.shape[0], image.shape[1], 3])
-#     color[image == 0] = [0, 102, 0]  # shrub
-#     color[image == 1] = [0, 255, 255]  # savanna
-#     color[image == 2] = [0, 204, 0]  # grassland
-#     color[image == 3] = [0, 128, 255]  # croplands
-#     color[image == 4] = [0, 0, 255]  # urban
-#     color[image == 5] = [128, 128, 128]  # barren
-#     color[image == 6] = [255, 128, 0]  # water
-#     return color
 
 def color_annotation(image):
     color = np.ones([image.shape[0], image.shape[1], 3])
@@ -89,8 +67,19 @@ def get_args():
     parser.add_argument('-is', '--input_shape', default=(256, 256), type=tuple, dest='input_shape')
     return parser.parse_args()
 
-n_years = 6
+n_years = 20
 n_classes = 4
+# define config
+config = {
+        "l1": 64,
+        "l2": 'na',
+        "lr": 0.0012,
+        "batch_size": 6,
+        "epochs": 150,
+        "model_n" : 'pop_02-20_3y_static'}
+
+
+
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -100,25 +89,50 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/lulc_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm_buf.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
-    # scaled_data = torch.nn.functional.interpolate(torch.from_numpy(ori_data),
-    #                                               scale_factor=(1 / 3, 1 / 3),
-    #                                               recompute_scale_factor=True)
-    # processed_ori_data = scaled_data.numpy()
     processed_ori_data = ori_data
-    valid_input = processed_ori_data[-5:-1, :, :, :] # [1:5, :, :, :] = years 2000 - 2020
-    gt = processed_ori_data[-1, 0, :, :] # last year, land cover
-    print('valid_sequence shape: ', valid_input.shape)
+    #valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # 2004-2016, 4y interval, no lc unnormed
+    # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
+    # valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
+    # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
+    if config['model_n'] == 'pop_01-20_4y':
+        valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # years 2004-2016, 4y interval
+    
+    elif config['model_n'] == 'pop_05-20_3y':
+        valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # years 2008-2017, 3y interval
+    
+    elif config['model_n'] == 'pop_10-20_2y':
+        valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # years 2012-2018, 2y interval
+    
+    elif config['model_n'] == 'pop_15-20_1y':
+        valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # years 2016-2019, 1y interval
+        
+    elif config['model_n'] == 'pop_02-20_3y':
+        valid_input = processed_ori_data[[4,7,10,13,16], 1:, :, :] # years 2005-2017, 3y interval
+    
+    elif config['model_n'] == 'pop_02-20_2y':
+        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17], 1:, :, :] # years 2004-2018, 2y interval
+    
+    elif config['model_n'] == 'pop_01_20_1y':
+        valid_input = processed_ori_data[1:19, 1:, :, :] # years 2002-2019, 1y interval
+    
+    elif config['model_n'] == 'pop_02-20_3y_static':
+         valid_input = processed_ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval   
+         valid_input = valid_input[:,[1,3,4,5,6],:,:]
+    
+    
+    gt = processed_ori_data[-1, 1, :, :] # last year, pop
+    print('valid_sequence shape: ', valid_input.shape) # t,c,w,h; pop, ...
 
-    input_channel = 10 # 19
+    input_channel = 5 #10 # 19
 
     df = pd.DataFrame()
-    valid_record = {'kappa': 0, 'acc': 0}
+    valid_record = {'mae': 0, 'rmse': 0}
 
-    #dir_checkpoint = './ckpts/forecasting/{}_{}/{}/CP_epoch100.pth'
-    dir_checkpoint = proj_dir + "data/ckpts/No_seed_convLSTM_20y_4c_no_na_oh_norm_random_search_15-20/lr0.009581606884006175_bs4/CP_epoch14.pth"
+    dir_checkpoint = proj_dir + "data/ckpts/{}_buf/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
+    # "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
 
     print(dir_checkpoint)
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
@@ -132,46 +146,70 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for test_img in tqdm(sub_img_list):
-            # test_img = pre_prcessing(test_img)
+
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
-            # test_img = min_max_scale(test_img) # added to scale all factors but the lc
 
             net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[16, args.n_features],
+                          hidden_dim=[64, 1], # args.n_features],
                           kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
                           batch_first=True, bias=bias_status, return_all_layers=False)
-
+            
+            # net = ConvBLSTM(input_dim = input_channel,
+            #                hidden_dim=config['l1'], #args.n_features], 
+            #                kernel_size=3, # num_layers=args.n_layer,
+            #                batch_first=True, bias=bias_status, return_all_layers=False)
+            
             net.to(device)
             net.load_state_dict(torch.load(dir_checkpoint))
-            # net.eval() # added from Pytorch tutorial
+          
+            output_list = net(test_img) # all factors but lc
 
-            output_list = net(test_img[:,:,1:,:,:]) # 1: for all factors but lc
-
-            masks_pred = output_list[0].view(args.seq_len, args.n_features, 256, 256) # t, c, w, h
-            pred_prob = torch.softmax(torch.squeeze(masks_pred),dim=1).data.cpu().numpy()
-            pred_img = np.squeeze(np.argmax(pred_prob, axis=1)[-1:,:,:])
-            pred_img_list.append(pred_img)
+            masks_pred = output_list[0].squeeze().view(-1, 256, 256) # t, c, w, h
+            pred_img_list.append(masks_pred[-1,:,:].cpu().numpy())
+            
+           
 
     pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
 
     h = 0
-    x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
+    # x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
     for x, y in zip(x_list, y_list):
         if x == np.min(x_list) or x == np.max(x_list) or y == np.min(y_list) or y == np.max(y_list):
             pred_msk[x - 128:x + 128, y - 128:y + 128] = pred_img_list[h]
             h += 1
         else:
-            pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
+            # pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
+            pred_msk[x - 106:x + 106, y - 106:y + 106] = pred_img_list[h][22:234,22:234]
             h += 1
 
-    k, acc = evaluate(pred_msk, gt)
-    print('kappa: ', k, 'acc: ', acc)
+    val_mae, val_rmse = evaluate(gt, pred_msk)
+    print('mae: ', val_mae)
+    print('rmse: ', val_rmse)
+    plt.imshow(pred_msk)
+
+    # rescale to actual pop values
+    ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_buf.npy')
+    pop_unnormed = ori_unnormed[:, 1, :, :]
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaler.fit(pop_unnormed.reshape(-1, 1))
+    pop = scaler.inverse_transform(pred_msk.reshape(-1,1)).reshape(pred_msk.shape[-2], pred_msk.shape[-1])
+    
 
 
-    save_path = proj_dir + 'data/test/No_seed_convLSTM_20y_4c_no_na_oh_norm_random_search_15-20/lr0.009581606884006175_bs4/'#.format(pred_seq, model_n,factor_option)
+
+    save_path = proj_dir + "data/test/{}_buf/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
+    # 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
 
     # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
     os.makedirs(save_path, exist_ok=True)
-    np.save(save_path + 'pred_msk_eval.npy', pred_msk)
-    cv2.imwrite(save_path + 'pred_msk_eval.png', color_annotation(pred_msk))
+    np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
+    np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
+    #cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
+    plt.savefig(save_path + 'pred_msk_eval.png')
+    
+
+import tifffile
+tifffile.imwrite(save_path + 'pred_msk_normed.tif', pred_msk)
+tifffile.imwrite(save_path + 'pred_msk_rescaled.tif', pop)
+

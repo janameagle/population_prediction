@@ -154,15 +154,15 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
 
 
 class EarlyStopping():
-    def __init__(self, tolerance=5, min_delta=0):
+    def __init__(self, tolerance=10, min_delta=0.01):
 
         self.tolerance = tolerance
         self.min_delta = min_delta
         self.counter = 0
         self.early_stop = False
 
-    def __call__(self, train_loss, validation_loss):
-        if (validation_loss - train_loss) > self.min_delta:
+    def __call__(self, train_rmse, validation_rmse):
+        if abs(validation_rmse - train_rmse) > self.min_delta:
             self.counter +=1
             if self.counter >= self.tolerance:  
                 self.early_stop = True
@@ -316,7 +316,7 @@ def train_ConvGRU(config):
                 
 
         # Early stopping
-        early_stopping(train_record['train_loss'], val_record['val_loss'])
+        early_stopping(train_record['train_rmse'], val_record['val_rmse'])
         if early_stopping.early_stop:
             print("We are at epoch:", epoch)
             break
@@ -334,8 +334,8 @@ config = {
         "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001] #  # 
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
-        "epochs": 50,
-        "model_n" : 'pop_01-20_4y_static',
+        "epochs": 150,
+        "model_n" : 'pop_02-20_3y_static',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,
