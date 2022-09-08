@@ -6,7 +6,7 @@ Created on Thu Jun 23 12:42:32 2022
 """
 
 
-from model.v_convlstm import ConvLSTM
+from model.v_lstm import MV_LSTM
 import os
 import torch
 import torch.nn as nn
@@ -20,19 +20,17 @@ from utilis.dataset import MyDataset
 # from utilis.dataset import min_max_scale
 from train.options import get_args
 from utilis.weight_init import weight_init
-# from sklearn.metrics import cohen_kappa_score
-# from sklearn.metrics import accuracy_score
+from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import accuracy_score
 import numpy as np
 from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 from GPUtil import showUtilization as gpu_usage
-# import random
+import random
 import matplotlib.pyplot as plt
 from sklearn import metrics
 import csv
 
 
-# print("initial usage")
-# gpu_usage()
 
 proj_dir = "H:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
@@ -92,18 +90,15 @@ def get_valid_dataset(ori_data_dir, model_name):
     elif model_name == 'pop_02-20_2y':
         valid_input = processed_ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
     
-    elif model_name == 'pop_01_20_1y':
-        valid_input = processed_ori_data[1:, :, :, :] # years 2002-2020, 1y interval
-     
-    elif model_name == 'pop_01-20_4y_static':
-        valid_input = processed_ori_data[[3,7,11,15,19], :, :, :] # years 2004-2020, 4y interval
-        valid_input = valid_input[:,[1,3,4,5,6],:,:]
-        
-    elif model_name == 'pop_02-20_3y_static':
+    elif model_name == 'pop_01-20_4y_LSTM':
+        valid_input = processed_ori_data[[3,7,11,15,19], :, :, :] # years 2002-2020, 1y interval
+    
+    elif model_name == 'pop_02-20_3y_static_LSTM':
          valid_input = processed_ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval   
          valid_input = valid_input[:,[1,3,4,5,6],:,:]
-     
-      
+         
+         
+        
     gt = processed_ori_data[19, 1, :, :] # last year, pop
     return valid_input, gt
 
@@ -115,25 +110,24 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
         sub_img_list.append(sub_img)
 
     pred_img_list = []
+    total_loss = 0
     with torch.no_grad():
         for test_img in sub_img_list:
-    
-            test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
-                                                                                   dtype=torch.float32)
+            test_img = test_img.reshape(test_img.shape[0], test_img.shape[1], test_img.shape[-2]*test_img.shape[-1]) # (t,c, w*h)
+            test_img = np.moveaxis(test_img, 2, 0) # (w*h, t, c)
+            test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
 
-            output_list = net(test_img[:, :-1, :, :, :]) # except last year, except lc
 
-            pred_img = output_list[0].squeeze()
-            # lin = nn.Linear(1,1)
-            # pred = lin(masks_pred.permute(0,1,3,4,2)).permute(0,1,4,2,3)
-            
-            pred_img = pred_img[-1,:,:] # take last year prediction
+            pred_img = net(test_img[:, :-1, :]) # all except lc, except last year
+
+            pred_img = pred_img[:,0] # take last year prediction
             criterion = nn.MSELoss() # no crossentropyloss for regression
-            loss = criterion(pred_img.float(), test_img[:,-1,0,:,:].squeeze().float()) # for validation loss
+            loss = criterion(pred_img.float(), test_img[:,-1,1].squeeze().float()) # for validation loss
 
-            pred_img_list.append(pred_img.cpu().numpy())
+            pred_img_list.append(pred_img.cpu().numpy().reshape(256, 256))
    
-    
+            total_loss += loss.item() 
+   
     pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
 
     h = 0
@@ -149,20 +143,21 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
 
     val_rmse = evaluate(gt, pred_msk)
     plt.imshow(pred_msk)
+    total_loss = total_loss / len(sub_img_list)
 
-    return val_rmse, loss.item()
+    return val_rmse, total_loss
 
 
 class EarlyStopping():
-    def __init__(self, tolerance=10, min_delta=0.01):
+    def __init__(self, tolerance=5, min_delta=0):
 
         self.tolerance = tolerance
         self.min_delta = min_delta
         self.counter = 0
         self.early_stop = False
 
-    def __call__(self, train_rmse, validation_rmse):
-        if abs(validation_rmse - train_rmse) > self.min_delta:
+    def __call__(self, train_loss, validation_loss):
+        if (validation_loss - train_loss) > self.min_delta:
             self.counter +=1
             if self.counter >= self.tolerance:  
                 self.early_stop = True
@@ -177,12 +172,13 @@ args = get_args()
 bias_status = True                                         
 beta = 0                                                          
 
-input_channel = 5 #10 #5 # driving factors                                          
+input_channel = 5 #10 # driving factors                                          
 factor = 'with_factors'
 pred_sequence = 'forward'
 
 
 def train_ConvGRU(config):
+
     liveloss = PlotLosses()
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
     train_dir = dataset_dir + "train/pop_pred_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm_buf/"
@@ -191,21 +187,36 @@ def train_ConvGRU(config):
     
     ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm_buf.npy"
     valid_input, gt = get_valid_dataset(ori_data_dir, model_name = config['model_n'])
-
     
     
-    net = ConvLSTM(input_dim = input_channel,
-                   hidden_dim=[config['l1'], 1], #args.n_features], 
-                   kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
-                   batch_first=True, bias=bias_status, return_all_layers=False)
+    
+    # net = ConvLSTM(input_dim = input_channel,
+    #                hidden_dim=[config['l1'], 1], #args.n_features], 
+    #                kernel_size=(3, 3), num_layers = 2, # num_layers=args.n_layer,
+    #                batch_first=True, bias=bias_status, return_all_layers=False)
+    # net = MV_LSTM(input_size = input_channel,
+    #               hidden_size = [config['l1']],
+    #               num_layers = 1,
+    #               bias = bias_status,
+    #               batch_first = True,
+    #               bidirectional = False) # try true
+    net = MV_LSTM(n_features = input_channel,
+                  seq_length = 5,
+                  hidden_dim = config['l1'],
+                  num_layers = 1,
+                  batch_first = True,
+                  bidirectional = False) # try true
     net.to(device)
+    
+    # initialize hidden states
+    #!
     
     
     optimizer = optim.Adam(net.parameters(), lr = config['lr'], betas = (0.9, 0.999))
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.1, patience=10, verbose=True)
     criterion = nn.MSELoss() # no crossentropyloss for regression
 
-    net.apply(weight_init)
+   # net.apply(weight_init)
     df = pd.DataFrame()
     
     
@@ -216,20 +227,25 @@ def train_ConvGRU(config):
         train_record = {'train_loss': 0, 'train_rmse': 0}
 
         for i, (imgs, true_masks) in enumerate(train_loader):
-            imgs = imgs.to(device=device, dtype=torch.float32) # (b, t, c, w, h)
-            imgs = imgs[:,:,[0,2,3,4,5],:,:] # select static features only, lc is already removed
+            imgs = imgs.squeeze() # (t,c,w,h)
+            imgs = imgs[:,[0,2,3,4,5],:,:] # select static features only, lc is already removed
+            imgs = imgs.reshape(imgs.shape[0], imgs.shape[1], imgs.shape[-2]*imgs.shape[-1]) # (t,c, w*h)
+            imgs = torch.moveaxis(imgs, 2, 0) # (w*h, t, c)
+            imgs = imgs.to(device=device, dtype=torch.float32) # (w*h, t, c)
+                        
 
-            # imgs = Variable(imgs[:,-6:-2,1:,:,:]) # b, t, c, w, h, 2015 - 2018, no lc
-            # imgs = Variable(imgs) # b, t, c, w, h, 2015 - 2018, no lc
-
-            # true_masks = true_masks[:,-5:-1,:,:].to(device, dtype=torch.float32) # (b, t, w, h)
-            true_masks = true_masks.to(device, dtype=torch.float32) # (b, t, w, h)
+            true_masks = true_masks.squeeze()
+            true_masks = true_masks.reshape(true_masks.shape[0], true_masks.shape[-2]*true_masks.shape[-1])
+            true_masks = torch.moveaxis(true_masks,1,0) # (w*h, t)
+            true_masks = true_masks.to(device, dtype=torch.float32) # (w*h, t)
             
-            output_list = net(imgs) # all factors but lc, 4 years
+            
+            net.init_hidden(imgs.shape[0])
+            output = net(imgs) # all factors but lc, 4 years. out = all hidden states, hidden = last hidden states
 
-            masks_pred = output_list[0].squeeze() # (b, t, w, h)
-            masks_pred = masks_pred[:,-1,:,:]
-            loss = criterion(masks_pred, true_masks[:,-1,:,:]) # 4 years, (b, c, t, w, h), squeeze removes channel dim 1
+            #masks_pred = output_list[0].squeeze() # (b, t, w, h)
+            #masks_pred = masks_pred[:,-1,:,:]
+            loss = criterion(output.view(-1), true_masks[:,-1]) 
 
             optimizer.zero_grad() # set the gradients to zero
             loss.backward()
@@ -238,9 +254,8 @@ def train_ConvGRU(config):
 
             
             # get acc / error
-            pred_for_acc = masks_pred.reshape(masks_pred.shape[0]*masks_pred.shape[-2]*masks_pred.shape[-1]).detach().numpy() # last year?
-            true_masks_for_acc = true_masks[:,-1,:,:].reshape(true_masks.shape[0]*true_masks.shape[-2]*true_masks.shape[-1]).detach().numpy() # last year?
-
+            pred_for_acc = output.detach().numpy()
+            true_masks_for_acc = true_masks[:,-1].detach().numpy()
             
             # mae += metrics.mean_absolute_error(pred_for_acc, true_masks_for_acc)
             rmse += metrics.mean_squared_error(pred_for_acc, true_masks_for_acc, squared = False)
@@ -296,7 +311,7 @@ def train_ConvGRU(config):
             dir_checkpoint = proj_dir + "data/ckpts/{}_buf/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
             os.makedirs(dir_checkpoint, exist_ok=True)
             torch.save(net.state_dict(),
-                        dir_checkpoint + f'CP_epoch{epoch}.pth')
+                       dir_checkpoint + f'CP_epoch{epoch}.pth')
             logging.info(f'Checkpoint {epoch} saved !')
         
         if config["save_csv"]:
@@ -316,26 +331,21 @@ def train_ConvGRU(config):
                 
 
         # Early stopping
-        early_stopping(train_record['train_rmse'], val_record['val_rmse'])
+        early_stopping(train_record['train_loss'], val_record['val_loss'])
         if early_stopping.early_stop:
             print("We are at epoch:", epoch)
             break
 
 
-        
-# print("usage before main")
-# gpu_usage()
-
-
 
 # define random choice of hyperparameters
 config = {
-        "l1": 64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256] #64, # 
-        "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
-        "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001] #  # 
-        "batch_size": 6, #random.choice([2, 4, 6, 8]),
-        "epochs": 150,
-        "model_n" : 'pop_02-20_3y_static',
+        "l1": 64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256] # 64
+        "l2": 'na', # 2 ** np.random.randint(2, 8), # 'na', # 
+        "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001] # 0.0012, # 
+        "batch_size": 1, #random.choice([2, 4, 6, 8]), one image at a time is batch size 256*256
+        "epochs": 50,
+        "model_n" : 'pop_02-20_3y_static_LSTM', #'pop_01-20_4y_LSTM',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,
