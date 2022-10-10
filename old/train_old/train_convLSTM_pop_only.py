@@ -71,31 +71,31 @@ def get_valid_dataset(ori_data_dir, model_name):
     # valid_input = processed_ori_data[-5:, :, :, :] # years 2016 - 2019
     # valid_input = processed_ori_data[-5:, :, :, :] # years 2016 - 2019
     # gt = processed_ori_data[-1, 1, :, :] # last year, pop
-    if model_name == 'pop_01-20_4y':
-        valid_input = processed_ori_data[[3,7,11,15,19], :, :, :] # years 2004-2020, 4y interval
+    if model_name == '04-20_4y':
+        valid_input = processed_ori_data[[7,11,15,19], :, :, :] # years 2008-2020, 4y interval
     
-    elif model_name == 'pop_05-20_3y':
-        valid_input = processed_ori_data[[7,10,13,16,19], :, :, :] # years 2008-2020, 3y interval
+    # elif model_name == '05-20_3y':
+    #     valid_input = processed_ori_data[[7,10,13,16,19], :, :, :] # years 2008-2020, 3y interval
     
-    elif model_name == 'pop_10-20_2y':
-        valid_input = processed_ori_data[[11,13,15,17,19], :, :, :] # years 2012-2020, 2y interval
+    # elif model_name == '10-20_2y':
+    #     valid_input = processed_ori_data[[11,13,15,17,19], :, :, :] # years 2012-2020, 2y interval
     
-    elif model_name == 'pop_15-20_1y':
-        valid_input = processed_ori_data[[15,16,17,18,19], :, :, :] # years 2016-2020, 1y interval
+    # elif model_name == '15-20_1y':
+    #     valid_input = processed_ori_data[[15,16,17,18,19], :, :, :] # years 2016-2020, 1y interval
         
-    elif model_name == 'pop_02-20_3y':
+    elif model_name == '02-20_3y':
         valid_input = processed_ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
     
-    elif model_name == 'pop_02-20_2y':
+    elif model_name == '02-20_2y':
         valid_input = processed_ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
     
-    elif model_name == 'pop_01-20_1y':
+    elif model_name == '01-20_1y':
         valid_input = processed_ori_data[1:, :, :, :] # years 2002-2020, 1y interval
 
     elif model_name == 'pop_only_01-20_1y':
         valid_input = processed_ori_data[1:, 1, :, :] # years 2002-2020, 1y interval
         
-    elif model_name == 'pop_only_01-20_4y':
+    elif model_name == 'pop_only_04-20_4y':
         valid_input = processed_ori_data[[3,7,11,15,19], 1, :, :] # years 2004-2020, 1y interval
     
         

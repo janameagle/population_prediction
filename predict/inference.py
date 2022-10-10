@@ -1,26 +1,45 @@
 import numpy as np
-import argparse
 import os
 import torch
 from tqdm import tqdm
 from torch.autograd import Variable
-import cv2
-from sklearn.metrics import cohen_kappa_score
-from sklearn.metrics import accuracy_score
 import pandas as pd
 from model.v_convlstm import ConvLSTM
+from model.bi_convlstm import ConvBLSTM
+from model.v_convgru import ConvGRU
+from model.v_lstm import MV_LSTM
+from model.v_gru import GRU
 from sklearn.preprocessing import MinMaxScaler
-import torch.nn as nn
 from sklearn import metrics
 import matplotlib.pyplot as plt
-
-from model.bi_convlstm import ConvBLSTM
+import tifffile
 
 
 
 proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
+# define config
+config = {
+        "l1": 64, 
+        "l2": 'na', 
+        "lr": 0.0012, 
+        "batch_size": 6, 
+        "epochs": 50, #50
+        "model_n" : '02-20_3y',
+        "save" : True,
+        "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', ('linear_reg', 'multivariate_reg',' 'random_forest_reg')
+        "factors" : 'all' # 'all', 'static', 'pop'
+    }
+
+conv = False if config['model'] in ['LSTM' , 'GRU'] else True
+if conv == False: # LSTM and GRU
+    config['batch_size'] = 1
+    seq_length = 5
+    
+    
+save_name = '{}_{}_{}_fclayer/lr{}_bs{}_1l{}_2l{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"])        
+
+    
 
 def evaluate(gt, pred):
     mae = metrics.mean_absolute_error(gt, pred)
@@ -47,169 +66,164 @@ def get_subsample_centroids(img, img_size=50):
     return new_x_list, new_y_list
 
 
-def color_annotation(image):
-    color = np.ones([image.shape[0], image.shape[1], 3])
-    color[image == 0] = [0, 102, 0]  # vegetation
-    color[image == 1] =  [0, 0, 255]  # urban
-    color[image == 2] = [128, 128, 128]  # barren
-    color[image == 3] = [255, 128, 0]  # water
-    return color
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-def get_args():
-    parser = argparse.ArgumentParser(description='Train ConvLSTM Models', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-epoch', '--epoch', default=15, type=int, dest='epoch')
-    parser.add_argument('-lr', '--learn_rate', default=8e-4, type=float, dest='learn_rate')
-    parser.add_argument('-f', '--n_features', default=4, type=int, dest='n_features')
-    parser.add_argument('-b', '--batch_size', default=12, type=int, nargs='?', help='Batch size', dest='batch_size') #5
-    parser.add_argument('-n', '--n_layer', default=3, type=int, dest='n_layer')
-    parser.add_argument('-l', '--seq_len', default=4, type=int, dest='seq_len')
-    parser.add_argument('-is', '--input_shape', default=(256, 256), type=tuple, dest='input_shape')
-    return parser.parse_args()
+ori_data_dir = proj_dir + 'data/ori_data/input_all.npy'
+ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
 
-n_years = 20
-n_classes = 4
-# define config
-config = {
-        "l1": 64,
-        "l2": 'na',
-        "lr": 0.0012,
-        "batch_size": 6,
-        "epochs": 150,
-        "model_n" : 'pop_02-20_3y_static'}
-
-
-
-
-if __name__ == '__main__':
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # device = 'cpu'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-    args = get_args()
-
-    bias_status = True
-
-    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm_buf.npy'
-
-    ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
-    processed_ori_data = ori_data
-    #valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # 2004-2016, 4y interval, no lc unnormed
-    # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
-    # valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
-    # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
-    if config['model_n'] == 'pop_01-20_4y':
-        valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # years 2004-2016, 4y interval
+if config['model_n'] == '02-20_3y':
+    valid_input = ori_data[[7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
+      
+elif config['model_n'] == '01-20_4y':
+    valid_input = ori_data[[7,11,15,19], :, :, :] # years 2004-2020, 4y interval
+    # valid_input = valid_input[:,[1,3,4,5,6],:,:]              # static input features
     
-    elif config['model_n'] == 'pop_05-20_3y':
-        valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # years 2008-2017, 3y interval
+elif config['model_n'] == '02-20_2y':
+    valid_input = ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
+    # valid_input = valid_input[:,[1,3,4,5,6],:,:]                        # static input features
     
-    elif config['model_n'] == 'pop_10-20_2y':
-        valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # years 2012-2018, 2y interval
+elif config['model_n'] == '01_20_1y':
+    valid_input = ori_data[1:, :, :, :] # years 2002-2020, 1y interval
+    # valid_input = valid_input[:,[1,3,4,5,6],:,:]  # static input features
+
+
+
+if config['factors'] == 'all':
+    valid_input = valid_input[:,1:,:,:]  # all input features except multiclass lc
+elif config['factors'] == 'static':
+    valid_input = valid_input[:,[1,3,4,5,6],:,:]  # static input features
+elif config['factors'] == 'pop':
+    valid_input = valid_input[:, 1, :, :] # population data only
     
-    elif config['model_n'] == 'pop_15-20_1y':
-        valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # years 2016-2019, 1y interval
+
+gt = ori_data[-1, 1, :, :] # last year, population
+
+input_channel = 10 if config['factors'] == 'all' else 5 if config['factors'] == 'static' else 1
         
-    elif config['model_n'] == 'pop_02-20_3y':
-        valid_input = processed_ori_data[[4,7,10,13,16], 1:, :, :] # years 2005-2017, 3y interval
-    
-    elif config['model_n'] == 'pop_02-20_2y':
-        valid_input = processed_ori_data[[3,5,7,9,11,13,15,17], 1:, :, :] # years 2004-2018, 2y interval
-    
-    elif config['model_n'] == 'pop_01_20_1y':
-        valid_input = processed_ori_data[1:19, 1:, :, :] # years 2002-2019, 1y interval
-    
-    elif config['model_n'] == 'pop_02-20_3y_static':
-         valid_input = processed_ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval   
-         valid_input = valid_input[:,[1,3,4,5,6],:,:]
-    
-    
-    gt = processed_ori_data[-1, 1, :, :] # last year, pop
-    print('valid_sequence shape: ', valid_input.shape) # t,c,w,h; pop, ...
 
-    input_channel = 5 #10 # 19
+            
+df = pd.DataFrame()
+valid_record = {'mae': 0, 'rmse': 0}
+dir_checkpoint = proj_dir + 'data/ckpts/' + save_name + 'CP_epoch{}.pth'.format(config["epochs"]-1)        
 
-    df = pd.DataFrame()
-    valid_record = {'mae': 0, 'rmse': 0}
+x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
-    dir_checkpoint = proj_dir + "data/ckpts/{}_buf/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
-    # "data/ckpts/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/CP_epoch26.pth"
-
-    print(dir_checkpoint)
-    x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
-
-    sub_img_list = []
-    for x, y in zip(x_list, y_list):
+sub_img_list = []
+for x, y in zip(x_list, y_list):
+    if config['factors'] == 'pop':
+        sub_img = valid_input[:, np.newaxis, x - 128:x + 128, y - 128:y + 128]
+    else:
         sub_img = valid_input[:, :, x - 128:x + 128, y - 128:y + 128]
-        sub_img_list.append(sub_img)
+    sub_img_list.append(sub_img)
 
-    pred_img_list = []
+pred_img_list = []
 
-    with torch.no_grad():
-        for test_img in tqdm(sub_img_list):
+with torch.no_grad():
+    for test_img in tqdm(sub_img_list):
 
+        #plt.imshow(test_img[0,0,:,:])
+        #plt.show()        
+        
+           
+        if config["model"] == 'ConvLSTM':       
+            net = ConvLSTM(input_dim = input_channel,
+                           hidden_dim= 64, #[config['l1'], 1], 
+                           kernel_size=(3,3), num_layers = 1, # (3,3), num_layers = 2, 
+                           batch_first=True, return_all_layers=False)
+        
+        elif config["model"] == 'BiConvLSTM':
+            net = ConvBLSTM(input_dim = input_channel,
+                           hidden_dim=config['l1'],
+                           kernel_size=3,
+                           batch_first=True, return_all_layers=False)
+
+        elif config["model"] == 'LSTM':
+              net = MV_LSTM(n_features = input_channel,
+                            seq_length = seq_length,
+                            hidden_dim = config['l1'],
+                            num_layers = 1,
+                            batch_first = True,
+                            bidirectional = True) # try true
+        
+        elif config["model"] == 'GRU':
+              net = GRU(n_features = input_channel,
+                            seq_length = seq_length,
+                            hidden_dim = config['l1'],
+                            num_layers = 1,
+                            batch_first = True,
+                            bidirectional = True) # try true
+              
+        elif config["model"] == 'ConvGRU':
+            net = ConvGRU(input_dim = input_channel,
+                          hidden_dim = [config['l1'],1],
+                          kernel_size=(3,3), 
+                          num_layers = 2,
+                          batch_first = True, return_all_layers=False)
+            
+        net.to(device)
+        net.load_state_dict(torch.load(dir_checkpoint))
+        
+        
+        if conv == False: # LSTM and GRU
+            #test_img = test_img.squeeze()
+            test_img = test_img.reshape(test_img.shape[0], test_img.shape[1], test_img.shape[-2]*test_img.shape[-1]) # (t,c, w*h)
+            test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
+            test_img = torch.moveaxis(test_img, 2, 0) # (w*h, t, c)
+            net.init_hidden(test_img.shape[0])
+            pred_img = net(test_img) 
+            pred_img = pred_img[:, 0] # take last year prediction
+            pred_img_list.append(pred_img.cpu().numpy().reshape(256, 256))
+        
+        
+        else:
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
-
-            net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[64, 1], # args.n_features],
-                          kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
-                          batch_first=True, bias=bias_status, return_all_layers=False)
-            
-            # net = ConvBLSTM(input_dim = input_channel,
-            #                hidden_dim=config['l1'], #args.n_features], 
-            #                kernel_size=3, # num_layers=args.n_layer,
-            #                batch_first=True, bias=bias_status, return_all_layers=False)
-            
-            net.to(device)
-            net.load_state_dict(torch.load(dir_checkpoint))
-          
-            output_list = net(test_img) # all factors but lc
-
-            masks_pred = output_list[0].squeeze().view(-1, 256, 256) # t, c, w, h
-            pred_img_list.append(masks_pred[-1,:,:].cpu().numpy())
-            
+            output_list = net(test_img) 
+            pred_img = output_list[0].squeeze()
+            pred_img = pred_img[-1,:,:] # take last year prediction
+            pred_img_list.append(pred_img.cpu().numpy())
            
 
-    pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
+pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
 
-    h = 0
-    # x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
-    for x, y in zip(x_list, y_list):
-        if x == np.min(x_list) or x == np.max(x_list) or y == np.min(y_list) or y == np.max(y_list):
-            pred_msk[x - 128:x + 128, y - 128:y + 128] = pred_img_list[h]
-            h += 1
-        else:
-            # pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
-            pred_msk[x - 106:x + 106, y - 106:y + 106] = pred_img_list[h][22:234,22:234]
-            h += 1
+h = 0
+# x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
+for x, y in zip(x_list, y_list):
+    if x == np.min(x_list) or x == np.max(x_list) or y == np.min(y_list) or y == np.max(y_list):
+        pred_msk[x - 128:x + 128, y - 128:y + 128] = pred_img_list[h]
+        h += 1
+    else:
+        # pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
+        pred_msk[x - 106:x + 106, y - 106:y + 106] = pred_img_list[h][22:234,22:234]
+        h += 1
 
-    val_mae, val_rmse = evaluate(gt, pred_msk)
-    print('mae: ', val_mae)
-    print('rmse: ', val_rmse)
-    plt.imshow(pred_msk)
 
-    # rescale to actual pop values
-    ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_buf.npy')
-    pop_unnormed = ori_unnormed[:, 1, :, :]
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaler.fit(pop_unnormed.reshape(-1, 1))
-    pop = scaler.inverse_transform(pred_msk.reshape(-1,1)).reshape(pred_msk.shape[-2], pred_msk.shape[-1])
-    
+val_mae, val_rmse = evaluate(gt, pred_msk)
+print('mae: ', val_mae)
+print('rmse: ', val_rmse)
+plt.imshow(pred_msk)
 
 
 
-    save_path = proj_dir + "data/test/{}_buf/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
-    # 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
+# rescale to actual pop values
+ori_unnormed = np.load(proj_dir + 'data/ori_data/input_all_unnormed.npy')
+pop_unnormed = ori_unnormed[:, 1, :, :]
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaler.fit(pop_unnormed.reshape(-1, 1))
+pop = scaler.inverse_transform(pred_msk.reshape(-1,1)).reshape(pred_msk.shape[-2], pred_msk.shape[-1])
 
-    # save_path = proj_dir + 'data/test/forward/No_seed_convLSTM/No_seed_convLSTM_no_na_normed_clean_tiles/'#.format(pred_seq, model_n,factor_option)
-    os.makedirs(save_path, exist_ok=True)
-    np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
-    np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
-    #cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
-    plt.savefig(save_path + 'pred_msk_eval.png')
-    
 
-import tifffile
+
+save_path = proj_dir + "data/test/" + save_name
+os.makedirs(save_path, exist_ok=True)
+np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
+np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
+#cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
+plt.savefig(save_path + 'pred_msk_eval.png')
+
+
 tifffile.imwrite(save_path + 'pred_msk_normed.tif', pred_msk)
 tifffile.imwrite(save_path + 'pred_msk_rescaled.tif', pop)
 

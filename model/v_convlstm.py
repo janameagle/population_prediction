@@ -100,6 +100,7 @@ class ConvLSTM(nn.Module):
         self.batch_first = batch_first
         self.bias = bias
         self.return_all_layers = return_all_layers
+        self.seq_len = 5
         # self.time_steps = 4
 
         cell_list = []
@@ -112,8 +113,12 @@ class ConvLSTM(nn.Module):
                                           bias=self.bias))
 
         self.cell_list = nn.ModuleList(cell_list)
-
-
+        self.conv3d = torch.nn.Conv3d(in_channels = hidden_dim[-1], 
+                                      out_channels = 1,
+                                      kernel_size= (3,3,3), #self.kernel_size,
+                                      padding = 1,
+                                      bias=self.bias)
+        
     def forward(self, input_tensor, hidden_state=None):
         """
         Parameters
@@ -159,12 +164,17 @@ class ConvLSTM(nn.Module):
 
             layer_output_list.append(layer_output)
             last_state_list.append([h, c])
-
+        
+       
         if not self.return_all_layers:
             layer_output_list = layer_output_list[-1:]
             last_state_list = last_state_list[-1:]
-
-        return layer_output_list
+        
+        ###########
+        x = torch.moveaxis(layer_output_list[-1], 2, 1) # (b, t, hidden_dim, w, h) -> (b, hidden_dim, t, w, h)
+        out = self.conv3d(x)
+        
+        return out # layer_output_list # out
 
     def _init_hidden(self, batch_size, image_size):
         init_states = []

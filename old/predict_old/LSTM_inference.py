@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     bias_status = True
 
-    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm_buf.npy'
+    ori_data_dir = proj_dir + 'data/ori_data/input_all.npy' #'_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm_buf.npy'
 
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
     processed_ori_data = ori_data

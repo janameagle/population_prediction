@@ -18,7 +18,7 @@ from torch.optim import lr_scheduler
 import pandas as pd
 from utilis.dataset import MyDataset
 # from utilis.dataset import min_max_scale
-from train.options import get_args
+# from train.options import get_args
 from utilis.weight_init import weight_init
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import accuracy_score
@@ -89,6 +89,10 @@ def get_valid_dataset(ori_data_dir, model_name):
     elif model_name == 'pop_02-20_3y':
         valid_input = processed_ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
     
+    elif model_name == 'pop_02-20_3y_static':
+        valid_input = processed_ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
+        valid_input = valid_input[:,[1,3,4,5,6],:,:] 
+        
     elif model_name == 'pop_02-20_2y':
         valid_input = processed_ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
     
@@ -96,8 +100,8 @@ def get_valid_dataset(ori_data_dir, model_name):
         valid_input = processed_ori_data[1:, :, :, :] # years 2002-2020, 1y interval
         
     elif model_name == 'pop_01_20_4y_static':
-        valid_input = processed_ori_data[[3,7,11,15,19], [1,], :, :] # years 2002-2020, 1y interval
-         
+        valid_input = processed_ori_data[[3,7,11,15,19], :, :, :] # years 2002-2020, 1y interval
+        valid_input = valid_input[:,[1,3,4,5,6],:,:] 
          
         
     gt = processed_ori_data[19, 1, :, :] # last year, pop
@@ -117,7 +121,7 @@ def get_valid_record(valid_input, gt, net, device = device, factor_option = 'wit
             test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
 
-            output_list = net(test_img[:, :-1, 1:, :, :]) # all except lc, except last year
+            output_list = net(test_img[:, :-1, 1:, :, :]) # test_img[:, :-1, 1:, :, :] all except lc, except last year
 
             pred_img = output_list[0].squeeze()
             # lin = nn.Linear(1,1)
@@ -167,7 +171,7 @@ class EarlyStopping():
 early_stopping = EarlyStopping(tolerance=5, min_delta=10)               
 
 print(device)
-args = get_args()
+# args = get_args()
 
 
 bias_status = True                                         
@@ -181,14 +185,16 @@ pred_sequence = 'forward'
 def train_ConvGRU(config):
     liveloss = PlotLosses()
     dataset_dir = proj_dir + "data/" # "train_valid/{}/{}/".format(pred_seq,'dataset_1')
-    train_dir = dataset_dir + "train/pop_pred_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm_buf/"
+    train_dir = dataset_dir + "train/"
     train_data = MyDataset(imgs_dir = train_dir + 'input/', masks_dir = train_dir +'target/', model_name = config['model_n'])
     train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
     
-    ori_data_dir = proj_dir + "data/ori_data/pop_pred/input_all_" + str(config['n_years']) + "y_" + str(config['n_classes'])+ "c_no_na_oh_norm_buf.npy"
+    ori_data_dir = proj_dir + "data/ori_data/input_all_20y_4c_no_na_oh_norm_buf.npy"
     valid_input, gt = get_valid_dataset(ori_data_dir, model_name = config['model_n'])
     
-    
+    # # for testing
+    # ori_dir2 = proj_dir + 'data/ori_data/input_all_20y_4c_no_na_oh_norm_buf.npy'
+    # vi,gt2 = get_valid_dataset(ori_dir2, config['model_n'])
     
     net = ConvLSTM(input_dim = input_channel,
                    hidden_dim=[config['l1'], 1], #args.n_features], 
@@ -213,7 +219,8 @@ def train_ConvGRU(config):
 
         for i, (imgs, true_masks) in enumerate(train_loader):
             imgs = imgs.to(device=device, dtype=torch.float32) # (b, t, c, w, h)
-
+            # imgs = imgs[:,:,[0,2,3,4,5],:,:] # select static features only, lc is already removed
+            
             # imgs = Variable(imgs[:,-6:-2,1:,:,:]) # b, t, c, w, h, 2015 - 2018, no lc
             # imgs = Variable(imgs) # b, t, c, w, h, 2015 - 2018, no lc
 
@@ -330,7 +337,7 @@ config = {
         "lr": 0.0012, #round(np.random.uniform(0.01, 0.00001), 4), # [0.1, 0.00001] # 0.0012, # 
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : 'pop_01_20_1y',
+        "model_n" : 'pop_02-20_3y',
         "save_cp" : True,
         "save_csv" : True,
         "n_years" : 20,

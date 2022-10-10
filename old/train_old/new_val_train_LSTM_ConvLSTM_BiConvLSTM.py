@@ -8,9 +8,7 @@ Created on Thu Jun 23 12:42:32 2022
 
 from model.v_convlstm import ConvLSTM
 from model.bi_convlstm import ConvBLSTM
-from model.v_convgru import ConvGRU
 from model.v_lstm import MV_LSTM
-from model.v_gru import GRU
 import os
 import torch
 import torch.nn as nn
@@ -33,20 +31,20 @@ import time
 
 # define hyperparameters
 config = {
-        "l1": 64, #64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
+        "l1": 64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
         "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
-        "batch_size": 6, #6, #random.choice([2, 4, 6, 8]),
+        "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save_cp" : True,
         "save_csv" : True,
-        "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'ConvGRU'
-        "factors" : 'pop' # 'all', 'static', 'pop'
+        "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM'
+        "factors" : 'static' # 'all', 'static', 'pop'
     }
 
 
-conv = False if config['model'] in ['LSTM' , 'GRU'] else True
+
 proj_dir = "H:/Masterarbeit/population_prediction/"
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -66,8 +64,8 @@ def get_subsample_centroids(img, img_size=50):
     h_step = int(h_total // img_size * 1.5)
     w_step = int(w_total // img_size * 1.5)
 
-    x_list = np.linspace(img_size//2, h_total-img_size//2, num = h_step)
-    y_list = np.linspace(img_size//2, w_total -img_size//2, num= w_step)
+    x_list = np.linspace(img_size//2, h_total-img_size//2, num = 10) # h_step
+    y_list = np.linspace(img_size//2, w_total -img_size//2, num= 10) # w_step
 
     new_x_list = []
     new_y_list = []
@@ -84,27 +82,55 @@ def get_valid_dataset(ori_data_dir, model_name):  # input data for validation
     ori_data = np.load(ori_data_dir)
     if model_name == '02-20_3y':
         valid_input = ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
-    
-    elif model_name == '04-20_4y':
-        valid_input = ori_data[[7,11,15,19], :, :, :] # years 2008-2020, 4y interval
-       
+        
+    # elif model_name == 'pop_02-20_3y_static':
+    #      valid_input = ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval   
+         # valid_input = valid_input[:,[1,3,4,5,6],:,:]                 # static input features
+        
+    elif model_name == '01-20_4y':
+        valid_input = ori_data[[3,7,11,15,19], :, :, :] # years 2004-2020, 4y interval
+        # valid_input = valid_input[:,[1,3,4,5,6],:,:]              # static input features
+        
     elif model_name == '02-20_2y':
         valid_input = ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
+        # valid_input = valid_input[:,[1,3,4,5,6],:,:]                        # static input features
         
-    elif model_name == '01-20_1y':
+    elif model_name == '01_20_1y':
         valid_input = ori_data[1:, :, :, :] # years 2002-2020, 1y interval
-        
+        # valid_input = valid_input[:,[1,3,4,5,6],:,:]  # static input features
 
+        
+    # elif model_name == 'pop_01-20_4y':
+    #     valid_input = ori_data[[3,7,11,15,19], :, :, :] # years 2004-2020, 4y interval
+    
+    # elif model_name == 'pop_05-20_3y':
+    #     valid_input = ori_data[[7,10,13,16,19], :, :, :] # years 2008-2020, 3y interval
+    
+    # elif model_name == 'pop_10-20_2y':
+    #     valid_input = ori_data[[11,13,15,17,19], :, :, :] # years 2012-2020, 2y interval
+    
+    # elif model_name == 'pop_15-20_1y':
+    #     valid_input = ori_data[[15,16,17,18,19], :, :, :] # years 2016-2020, 1y interval
+        
+    # elif model_name == 'pop_02-20_3y':
+    #     valid_input = ori_data[[4,7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
+    
+    # elif model_name == 'pop_02-20_2y':
+    #     valid_input = ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
+    
+    # elif model_name == 'pop_01_20_1y':
+    #     valid_input = ori_data[1:, :, :, :] # years 2002-2020, 1y interval
+    
     
     if config['factors'] == 'all':
         valid_input = valid_input[:,1:,:,:]  # all input features except multiclass lc
     elif config['factors'] == 'static':
-        valid_input = valid_input[:,[1,3,4,5,6],:,:]  # static input features: pop, slope, road dist, water dist, center dist
+        valid_input = valid_input[:,[1,3,4,5,6],:,:]  # static input features
     elif config['factors'] == 'pop':
         valid_input = valid_input[:, 1, :, :] # population data only
         
 
-    gt = ori_data[19, 1, :, :] # last year, population
+    gt = ori_data[-1, 1, :, :] # last year, population
     return valid_input, gt
 
 
@@ -112,17 +138,14 @@ def get_valid_record(valid_input, gt, net, factors, device = device):
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
     sub_img_list = []
     for x, y in zip(x_list, y_list):
-        if config['factors'] == 'pop':
-            sub_img = valid_input[:, np.newaxis, x - 128:x + 128, y - 128:y + 128]
-        else:
-            sub_img = valid_input[:, :, x - 128:x + 128, y - 128:y + 128]
+        sub_img = valid_input[:, :, x - 128:x + 128, y - 128:y + 128]
         sub_img_list.append(sub_img)
 
     pred_img_list = []
     with torch.no_grad():
         for test_img in sub_img_list:
             
-            if conv == False: # LSTM and GRU
+            if config["model"] == 'LSTM':
                 test_img = test_img.reshape(test_img.shape[0], test_img.shape[1], test_img.shape[-2]*test_img.shape[-1]) # (t,c, w*h)
                 test_img = np.moveaxis(test_img, 2, 0) # (w*h, t, c)
                 test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
@@ -151,9 +174,7 @@ def get_valid_record(valid_input, gt, net, factors, device = device):
             pred_msk[x - 128:x + 128, y - 128:y + 128] = pred_img_list[h]
             h += 1
         else:
-            # pred_msk[x - 106:x + 106, y - 106:y + 106] = pred_img_list[h][22:234, 22:234]
-            pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248, 8:248]
-          
+            pred_msk[x - 106:x + 106, y - 106:y + 106] = pred_img_list[h][22:234, 22:234]
             h += 1
 
     val_rmse = evaluate(gt, pred_msk)
@@ -180,30 +201,26 @@ class EarlyStopping():
               
 
 def train_ConvGRU(config):
-    if conv == False: # LSTM and GRU
+    if config['model'] == 'LSTM':
         config['batch_size'] = 1
         seq_length = 5
     
     liveloss = PlotLosses()
     train_dir = proj_dir + "data/train/"
     train_data = MyDataset(imgs_dir = train_dir + 'input/', masks_dir = train_dir +'target/', model_name = config['model_n'])
-    train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True, num_workers= 0)
+    train_loader = DataLoader(dataset = train_data, batch_size = config['batch_size'], shuffle=True) #, num_workers= 0)
     
     ori_data_dir = proj_dir + "data/ori_data/input_all.npy"
-    # ori_data_dir = proj_dir + 'data/ori_data/input_all_20y_4c_no_na_oh_norm_buf.npy'
     valid_input, gt = get_valid_dataset(ori_data_dir, config['model_n'])
-    
-    # for testing
-    # ori_dir2 = proj_dir + 'data/ori_data/input_all_20y_4c_no_na_oh_norm_buf.npy'
-    # vi,gt2 = get_valid_dataset(ori_dir2, config['model_n'])
+
     
     input_channel = 10 if config['factors'] == 'all' else 5 if config['factors'] == 'static' else 1
      
     
     if config["model"] == 'ConvLSTM':       
         net = ConvLSTM(input_dim = input_channel,
-                       hidden_dim= 64, #[config['l1'], 1], 
-                       kernel_size=(3,3), num_layers = 1, # (3,3), num_layers = 2, 
+                       hidden_dim=[config['l1'], 1], 
+                       kernel_size=(3, 3), num_layers = 2, 
                        batch_first=True, return_all_layers=False)
     
     elif config["model"] == 'BiConvLSTM':
@@ -218,37 +235,21 @@ def train_ConvGRU(config):
                         hidden_dim = config['l1'],
                         num_layers = 1,
                         batch_first = True,
-                        bidirectional = True) # try true
-    
-    elif config["model"] == 'GRU':
-          net = GRU(n_features = input_channel,
-                        seq_length = seq_length,
-                        hidden_dim = config['l1'],
-                        num_layers = 1,
-                        batch_first = True,
-                        bidirectional = True) # try true
-          
-    elif config["model"] == 'ConvGRU':
-        net = ConvGRU(input_dim = input_channel,
-                      hidden_dim = [config['l1'],1],
-                      kernel_size=(3,3), 
-                      num_layers = 2,
-                      batch_first = True, return_all_layers=False)
-
+                        bidirectional = False) # try true
+        
 
     net.to(device)
+    
     
     optimizer = optim.Adam(net.parameters(), lr = config['lr'], betas = (0.9, 0.999))
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
     criterion = nn.MSELoss()
 
-    if conv == True:
-        net.apply(weight_init)
-    
+    net.apply(weight_init)
     df = pd.DataFrame()
     
     
-    for epoch in range(config['epochs']):
+    for epoch in range(0, config['epochs']):
         net.train()
         rmse = 0
         train_record = {'train_rmse': 0} # {'train_loss': 0, 'train_rmse': 0}
@@ -257,13 +258,10 @@ def train_ConvGRU(config):
 
             if config['factors'] == 'static':
                 imgs = imgs[:,:,[0,2,3,4,5],:,:] # select static features only, lc is already removed
-         
-            if config['factors'] == 'pop':
-             imgs = imgs[:,:,0,:,:] # select pop only, lc is already removed
-             imgs = imgs[:,:,np.newaxis,:,:]
 
-            if conv == False: # LSTM and GRU. config['model'] == 'LSTM': # reshape to 1d
-                imgs = imgs.squeeze(0) # (t,c,w,h)
+
+            if config['model'] == 'LSTM': # reshape to 1d
+                imgs = imgs.squeeze() # (t,c,w,h)
                 imgs = imgs.reshape(imgs.shape[0], imgs.shape[1], imgs.shape[-2]*imgs.shape[-1]) # (t,c, w*h)
                 imgs = torch.moveaxis(imgs, 2, 0) # (w*h, t, c)
                 true_masks = true_masks.squeeze()
@@ -276,7 +274,7 @@ def train_ConvGRU(config):
             true_masks = true_masks.to(device, dtype=torch.float32) # (b, t, w, h)
             
             
-            if conv == False: #config['model'] == 'LSTM':
+            if config['model'] == 'LSTM':
                 output = net(imgs)
                 loss = criterion(output.view(-1), true_masks[:,-1]) 
                 pred_for_acc = output.detach().numpy()
@@ -285,9 +283,8 @@ def train_ConvGRU(config):
                 
             else:
                 output_list = net(imgs)
-                masks_pred = output_list.squeeze()
 
-                # masks_pred = output_list[0].squeeze() # (b, t, w, h)
+                masks_pred = output_list[0].squeeze() # (b, t, w, h)
                 masks_pred = masks_pred[:,-1,:,:] # last year's prediction
                 loss = criterion(masks_pred, true_masks[:,-1,:,:])
             
@@ -296,9 +293,8 @@ def train_ConvGRU(config):
             optimizer.step()
 
             # get error
-            if conv == True: #config['model'] != 'LSTM':
-                pred_for_acc = masks_pred.reshape(masks_pred.shape[0]*masks_pred.shape[-2]*masks_pred.shape[-1]).detach().numpy()
-                true_masks_for_acc = true_masks[:,-1,:,:].reshape(true_masks.shape[0]*true_masks.shape[-2]*true_masks.shape[-1]).detach().numpy()
+            pred_for_acc = masks_pred.reshape(masks_pred.shape[0]*masks_pred.shape[-2]*masks_pred.shape[-1]).detach().numpy()
+            true_masks_for_acc = true_masks[:,-1,:,:].reshape(true_masks.shape[0]*true_masks.shape[-2]*true_masks.shape[-1]).detach().numpy()
 
             
             # mae += metrics.mean_absolute_error(pred_for_acc, true_masks_for_acc)
@@ -346,9 +342,7 @@ def train_ConvGRU(config):
             
 
         print('---------------------------------------------------------------------------------------------------------')
-        
-        config["model_n"] = '02-20_3y_bi'
-        
+
         save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"])        
 
         if config["save_cp"]:
@@ -377,7 +371,7 @@ def train_ConvGRU(config):
         # Early stopping
         early_stopping(train_record['train_rmse'], val_record['val_rmse'])
         if early_stopping.early_stop:
-            print("Early stopped. We are at epoch:", epoch)
+            print("We are at epoch:", epoch)
             break
 
 
@@ -387,7 +381,7 @@ def train_ConvGRU(config):
 
 
 print(config)
-early_stopping = EarlyStopping(tolerance=10, min_delta=0.2) 
+early_stopping = EarlyStopping(tolerance=10, min_delta=0.01) 
 
 
 # run with current set of random hyperparameters

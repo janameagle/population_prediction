@@ -26,47 +26,52 @@ class MyDataset(Dataset):
         return len(self.ids)
 
     def __getitem__(self, index):
-        if self.model_name == 'pop_01-20_4y':
-            img = np.load(self.ids[index])[[0,3,7,11],:,:,:] # 2001-2012, 4y interval
-            mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:] # 2004-2016, 4y interval
+        if self.model_name == '04-20_4y':
+            img = np.load(self.ids[index])[[3,7,11],:,:,:] # 2004-2012, 4y interval
+            mask = np.load(self.msk_ids[index])[[7,11,15],:,:] # 2008-2016, 4y interval
         
-        elif self.model_name == 'pop_05-20_3y':
-            img = np.load(self.ids[index])[[4,7,10,13],1:,:,:] # 2005-2014, 3y interval
-            mask = np.load(self.msk_ids[index])[[7,10,13,16],:,:] # 2008-2017, 3y interval
+        # elif self.model_name == '05-20_3y':
+        #     img = np.load(self.ids[index])[[4,7,10,13],1:,:,:] # 2005-2014, 3y interval
+        #     mask = np.load(self.msk_ids[index])[[7,10,13,16],:,:] # 2008-2017, 3y interval
         
-        elif self.model_name == 'pop_10-20_2y':
-            img = np.load(self.ids[index])[[9,11,13,15],1:,:,:] # 2010-2016, 2y interval
-            mask = np.load(self.msk_ids[index])[[11,13,15,17],:,:] # 2012-2018, 2y interval
+        # elif self.model_name == '10-20_2y':
+        #     img = np.load(self.ids[index])[[9,11,13,15],1:,:,:] # 2010-2016, 2y interval
+        #     mask = np.load(self.msk_ids[index])[[11,13,15,17],:,:] # 2012-2018, 2y interval
         
-        elif self.model_name == 'pop_15-20_1y':
-            img = np.load(self.ids[index])[[14,15,16,17],1:,:,:] # 2015-2018, 1y interval
-            mask = np.load(self.msk_ids[index])[[15,16,17,18],:,:] # 2016-2019, 1y interval
+        # elif self.model_name == '15-20_1y':
+        #     img = np.load(self.ids[index])[[14,15,16,17],1:,:,:] # 2015-2018, 1y interval
+        #     mask = np.load(self.msk_ids[index])[[15,16,17,18],:,:] # 2016-2019, 1y interval
+        
+        elif self.model_name == '02-20_3y':
+            img = np.load(self.ids[index])[[1,4,7,10,13],:,:,:] # 2002-2014, 3y interval
+            mask = np.load(self.msk_ids[index])[[4,7,10,13,16],:,:] # 2005-2017, 3y interval
         
         elif self.model_name == 'pop_02-20_3y':
             img = np.load(self.ids[index])[[1,4,7,10,13],:,:,:] # 2002-2014, 3y interval
             mask = np.load(self.msk_ids[index])[[4,7,10,13,16],:,:] # 2005-2017, 3y interval
             
-        elif self.model_name == 'pop_02-20_2y':
+                
+        elif self.model_name == '02-20_2y':
             img = np.load(self.ids[index])[[1,3,5,7,9,11,13,15],1:,:,:] # 2002-2016, 2y interval
             mask = np.load(self.msk_ids[index])[[3,5,7,9,11,13,15,17],:,:] # 2004-2018, 2y interval
             
-        elif self.model_name == 'pop_01-20_1y':
+        elif self.model_name == '01-20_1y':
             img = np.load(self.ids[index])[0:18,1:,:,:] # 2001-2018, 1y interval
             mask = np.load(self.msk_ids[index])[1:19,:,:] # 2002-2019, 1y interval
             
-        elif self.model_name == 'pop_01-20_4y_LSTM':
+        elif self.model_name == '04-20_4y_LSTM':
             img = np.load(self.ids[index])[[0,3,7,11],1:,:,:] # 2001-2018, 1y interval
             mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:] # 2002-2019, 1y interval
             
-        elif self.model_name == 'pop_only_01-20_1y':
+        elif self.model_name == 'only_01-20_1y':
             img = np.load(self.ids[index])[0:18,1,:,:] # 2001-2018, 1y interval
             mask = np.load(self.msk_ids[index])[1:19,:,:] # 2002-2019, 1y interval
             
-        elif self.model_name == 'pop_only_01-20_4y':
+        elif self.model_name == 'only_01-20_4y':
             img = np.load(self.ids[index])[[0,3,7,11],0,:,:] # 2001-2012, 4y interval
             mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:] 
         
-        elif self.model_name == 'pop_01-20_4y_static':
+        elif self.model_name == '01-20_4y_static':
             img = np.load(self.ids[index])[[0,3,7,11],:,:,:] # 2001-2012, 4y interval
             mask = np.load(self.msk_ids[index])[[3,7,11,15],:,:]
             
@@ -74,7 +79,7 @@ class MyDataset(Dataset):
             img = np.load(self.ids[index])[[1,4,7,10,13],:,:,:] # 2002-2014, 3y interval
             mask = np.load(self.msk_ids[index])[[4,7,10,13,16],:,:] # 2005-2017, 3y interval
             
-        elif self.model_name == 'pop_02-20_3y_static_LSTM':
+        elif self.model_name == '02-20_3y_static_LSTM':
             img = np.load(self.ids[index])[[1,4,7,10,13],:,:,:] # 2002-2014, 3y interval
             mask = np.load(self.msk_ids[index])[[4,7,10,13,16],:,:] # 2005-2017, 3y interval
             

@@ -1,9 +1,9 @@
 import torch.nn as nn
 import torch
 
-class MV_LSTM(torch.nn.Module):
+class GRU(torch.nn.Module):
     def __init__(self,n_features,seq_length, hidden_dim, num_layers, batch_first = True, bidirectional = False):
-        super(MV_LSTM, self).__init__()
+        super(GRU, self).__init__()
         self.n_features = n_features
         self.seq_len = seq_length
         self.batch_first = batch_first
@@ -12,12 +12,12 @@ class MV_LSTM(torch.nn.Module):
         self.n_layers = 1 # because just one per hidden dim
         self.num_layers = num_layers # nr of stacked lstm layers
     
-        self.lstm1 = torch.nn.LSTM(input_size = n_features, 
+        self.gru1 = torch.nn.GRU(input_size = n_features, 
                                  hidden_size = self.n_hidden, #[0]
                                  num_layers = self.n_layers, 
                                  batch_first = self.batch_first,
                                  bidirectional = self.bidirectional)
-        # self.lstm2 = torch.nn.LSTM(input_size = self.n_hidden[0], 
+        # self.gru2 = torch.nn.LSTM(input_size = self.n_hidden[0], 
         #                          hidden_size = self.n_hidden[1],
         #                          num_layers = self.n_layers, 
         #                          batch_first = self.batch_first,
@@ -47,7 +47,7 @@ class MV_LSTM(torch.nn.Module):
     def forward(self, x):        
         batch_size, seq_len, _ = x.size() # b, t, c
         
-        lstm_out1, self.hidden_layer0 = self.lstm1(x) #, self.hidden_layer0) # (b, c, 2*hidden_dim), 2 if bidirectional
+        lstm_out1, self.hidden_layer0 = self.gru1(x) #, self.hidden_layer0) # (b, c, 2*hidden_dim), 2 if bidirectional
         #lstm_out2, self.hidden_layer1 = self.lstm2(lstm_out1, self.hidden_layer1)
         
         # lstm_out(with batch_first = True) is 
@@ -56,9 +56,3 @@ class MV_LSTM(torch.nn.Module):
         # .contiguous() -> solves tensor compatibility error
         x = lstm_out1.contiguous().view(batch_size,-1) #(b, t*c*hidden_dim*2) 2 if bidirectional
         return self.l_linear(x)
-
-  
-
-
-
-
