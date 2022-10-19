@@ -27,8 +27,9 @@ config = {
         "epochs": 50, #50
         "model_n" : '02-20_3y',
         "save" : True,
-        "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', ('linear_reg', 'multivariate_reg',' 'random_forest_reg')
-        "factors" : 'all' # 'all', 'static', 'pop'
+        "model": 'LSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', ('linear_reg', 'multivariate_reg',' 'random_forest_reg')
+        "factors" : 'pop', # 'all', 'static', 'pop'
+        "run" : 'lstmlstm'
     }
 
 conv = False if config['model'] in ['LSTM' , 'GRU'] else True
@@ -37,7 +38,7 @@ if conv == False: # LSTM and GRU
     seq_length = 5
     
     
-save_name = '{}_{}_{}_fclayer/lr{}_bs{}_1l{}_2l{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"])        
+save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])        
 
     
 
@@ -142,11 +143,11 @@ with torch.no_grad():
         elif config["model"] == 'LSTM':
               net = MV_LSTM(n_features = input_channel,
                             seq_length = seq_length,
-                            hidden_dim = config['l1'],
+                            hidden_dim = (config['l1'], 1),
                             num_layers = 1,
                             batch_first = True,
-                            bidirectional = True) # try true
-        
+                            bidirectional = False) # try true
+     
         elif config["model"] == 'GRU':
               net = GRU(n_features = input_channel,
                             seq_length = seq_length,

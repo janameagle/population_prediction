@@ -235,24 +235,29 @@ class ConvBLSTM(nn.Module):
                                       kernel_size=kernel_size,
                                       bias=bias) 
         
-        self.lstm = ConvLSTMCell(input_dim=hidden_dim*2,
-                    hidden_dim=1, # to create a regression output
-                    kernel_size=kernel_size,
-                    bias=bias)
+        # self.lstm = ConvLSTMCell(input_dim=hidden_dim*2,
+        #             hidden_dim=1, # to create a regression output
+        #             kernel_size=kernel_size,
+        #             bias=bias)
+        self.conv3d = torch.nn.Conv3d(in_channels = hidden_dim*2, 
+                                      out_channels = 1,
+                                      kernel_size= (3,3,3), #self.kernel_size,
+                                      padding = 1,
+                                      bias=bias)
         
 
     def forward(self, input_tensor, hidden_state=None):
         if not self.batch_first: # change order if batch size is not first dimension
             # (t, b, c, h, w) -> (b, t, c, h, w) # batch size, time, channel, height, width
             input_tensor = input_tensor.permute(1, 0, 2, 3, 4)
-        b, seq_len, _, h, w = input_tensor.size()
+        batch_size, seq_len, _, h, w = input_tensor.size()
 
         # Implement stateful ConvLSTM
         if hidden_state is not None:
             raise NotImplementedError()
         else:
             # Since the init is done in forward. Can send image size here
-            hidden_state, hidden_state_inv = self._init_hidden(batch_size=b, image_size = (h,w))
+            hidden_state, hidden_state_inv = self._init_hidden(batch_size=batch_size, image_size = (h,w))
         
         ## LSTM forward direction
         h, c = hidden_state
@@ -277,29 +282,36 @@ class ConvBLSTM(nn.Module):
             
             output_inv.append(h_inv)
         output_inv.reverse() 
-        output_inv = torch.stack((output_inv), dim=1)
-        layer_output = torch.cat((output_inner, output_inv), dim=2)
+        output_inv = torch.stack((output_inv), dim=1) #(b, t, dim, w, h)
         last_state_inv = [h_inv, c_inv]
+        # combine forward and backward direction
+        layer_output = torch.cat((output_inner, output_inv), dim=2) #(b,t,dim*2,w,h)
+        
     ###################################
       
         
-        ## standard LSTM layer
-        h, c = self._init_hidden_lstm(batch_size=b,image_size=(input_tensor.size(3), input_tensor.size(4)))
+        # ## standard LSTM layer
+        # h, c = self._init_hidden_lstm(batch_size=batch_size,image_size=(input_tensor.size(3), input_tensor.size(4)))
         
-        output_lstm = []
-        for t in range(seq_len): # loop over time steps
-            h, c = self.lstm(input_tensor = layer_output[:,t,:,:,:],#?
-                             cur_state = [h, c])    
-            output_lstm.append(h)
+        # output_lstm = []
+        # for t in range(seq_len): # loop over time steps
+        #     h, c = self.lstm(input_tensor = layer_output[:,t,:,:,:],#?
+        #                      cur_state = [h, c])    
+        #     output_lstm.append(h)
     
-        total_output = torch.stack(output_lstm, dim=1)
+        # total_output = torch.stack(output_lstm, dim=1)
     
-        # if not self.return_all_layers:
-        #     layer_output_list = layer_output_list[-1:]
-        #     last_state_list = last_state_list[-1:]
+        # # if not self.return_all_layers:
+        # #     layer_output_list = layer_output_list[-1:]
+        # #     last_state_list = last_state_list[-1:]
         
-        return total_output, [h,c]
+        # return total_output, [h,c]
+        
     
+        ## conv3d layer
+        x = torch.moveaxis(layer_output, 2,1) # (b,t,dim,w,h) -> (b,dim,t,w,h)
+        return self.conv3d(x)
+        
         # return layer_output if self.return_all_layers is True else layer_output[:, -1:], last_state, last_state_inv
 
 

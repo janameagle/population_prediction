@@ -30,7 +30,8 @@ config = {
         "model_n" : '02-20_3y',
         "save" : True,
         "model": 'LSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
-        "factors" : 'all' # 'all', 'static', 'pop'
+        "factors" : 'pop', # 'all', 'static', 'pop'
+        "run" : 'lstmlstm'
     }
 
 conv = False if config['model'] in ['LSTM' , 'GRU'] else True
@@ -47,7 +48,7 @@ lastyear = 20 - interval
 save_path = proj_dir + 'data/test/{}_{}_{}/'.format(config['model'], config['model_n'], config['factors'])
 
 if reg == False:
-    save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"])
+    save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])
    
 pred_path =  save_path + "pred_msk_eval_rescaled.npy"
 gt_path = proj_dir + 'data/ori_data/input_all_unnormed.npy'
@@ -58,7 +59,7 @@ gt = np.load(gt_path)
 
 # mask lima region -> island will be removed
 # set negative predicted values to 0
-lima = np.load(proj_dir + 'data/ori_data/Lima_region.npy')
+lima = np.load(proj_dir + 'data/ori_data/lima_ma.npy') # lima_ma is new lima regions
 pred[lima == 0] = np.nan # 0
 pred[pred < 0] = 0
     
@@ -96,47 +97,47 @@ diffcmap = ListedColormap(newcolors, name='RdGn')
 
 def spatial_plot(poplast, pop20, difflastpred, diff20pred, pred):
     # plot the differences to see prediction accuracy
-    fig, axs = plt.subplots(figsize = (15, 8))
+    # fig, axs = plt.subplots(figsize = (15, 8))
     
-    ax1 = plt.subplot(241)
-    plast = ax1.imshow(poplast[:, 100:], cmap = popcmap, vmin = 0, vmax = 300)
-    ax1.set_title("Pop 20" + str(lastyear))
-    ax1.set_axis_off()
+    # ax1 = plt.subplot(241)
+    # plast = ax1.imshow(poplast[:, 100:], cmap = popcmap, vmin = 0, vmax = 300)
+    # ax1.set_title("Pop 20" + str(lastyear))
+    # ax1.set_axis_off()
     
-    ax2 = plt.subplot(242)
-    p20 = ax2.imshow(pop20[:, 100:], cmap = popcmap, vmin = 0, vmax = 300)
-    ax2.set_title("Pop 2020")
-    ax2.set_axis_off()
+    # ax2 = plt.subplot(242)
+    # p20 = ax2.imshow(pop20[:, 100:], cmap = popcmap, vmin = 0, vmax = 300)
+    # ax2.set_title("Pop 2020")
+    # ax2.set_axis_off()
     
-    ax3 = plt.subplot(245)
-    difflast = ax3.imshow(difflastpred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
-    ax3.set_title("Diff pred - 20" + str(lastyear))
-    ax3.set_axis_off()
+    # ax3 = plt.subplot(245)
+    # difflast = ax3.imshow(difflastpred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
+    # ax3.set_title("Diff pred - 20" + str(lastyear))
+    # ax3.set_axis_off()
     
-    ax4 = plt.subplot(246)
-    diff20 = ax4.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
-    ax4.set_title("Diff pred - 2020")
-    ax4.set_axis_off()
-    fig.colorbar(diff20, ax = [ax3, ax4], location = 'bottom')
+    # ax4 = plt.subplot(246)
+    # diff20 = ax4.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
+    # ax4.set_title("Diff pred - 2020")
+    # ax4.set_axis_off()
+    # fig.colorbar(diff20, ax = [ax3, ax4], location = 'bottom')
     
-    ax5 = plt.subplot(122)
-    pr = ax5.imshow(pred[:, 100:], cmap = popcmap, vmin = 0, vmax = 300)
-    ax5.set_title("Prediction of 2020")
-    ax5.set_axis_off()
-    fig.colorbar(pr, ax = ax5)
+    # ax5 = plt.subplot(122)
+    # pr = ax5.imshow(pred[:, 100:], cmap = popcmap, vmin = 0, vmax = 300)
+    # ax5.set_title("Prediction of 2020")
+    # ax5.set_axis_off()
+    # fig.colorbar(pr, ax = ax5)
     
-    # add text
-    if reg == True:
-        fig.text(0.5, 0.12, 'Model: ' + config['model_n'],
-                 verticalalignment='bottom', fontsize = 12)
-    else:
-        fig.text(0.5, 0.12, 'Model: {}_{}_{}, lr {}, bs: {}, l1: {}, ep: {}'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["epochs"]),
-                 verticalalignment='bottom', fontsize = 12)
+    # # add text
+    # if reg == True:
+    #     fig.text(0.5, 0.12, 'Model: ' + config['model_n'],
+    #              verticalalignment='bottom', fontsize = 12)
+    # else:
+    #     fig.text(0.5, 0.12, 'Model: {}_{}_{}, lr {}, bs: {}, l1: {}, ep: {}'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["epochs"]),
+    #              verticalalignment='bottom', fontsize = 12)
     
     
-    # save to file
-    if config["save"] == True:
-        plt.savefig(save_path + 'spatial_pred_check.png')
+    # # save to file
+    # if config["save"] == True:
+    #     plt.savefig(save_path + 'spatial_pred_check_LMA.png')
     
     
         # save subplots
@@ -144,20 +145,20 @@ def spatial_plot(poplast, pop20, difflastpred, diff20pred, pred):
         plt.imshow(difflastpred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
         plt.title("Model: {}_{}_{} | Diff pred - 20{}".format(config["model"], config["model_n"], config["factors"], str(lastyear)))
         plt.colorbar(location = 'right')
-        difflast.savefig(save_path + 'spatial_pred_check_20{}.png'.format(lastyear))
+        difflast.savefig(save_path + 'spatial_pred_check_20{}_LMA.png'.format(lastyear))
         
         
         diff20 = plt.figure(figsize = (20,16))
         plt.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
         plt.title("Model: {}_{}_{} | Diff pred - 2020".format(config["model"], config["model_n"], config["factors"]))
         plt.colorbar(location = 'right')
-        diff20.savefig(save_path + 'spatial_pred_check_2020.png')
+        diff20.savefig(save_path + 'spatial_pred_check_2020_LMA.png')
     
         diffrate20 = plt.figure(figsize = (20,16))
         plt.imshow(diffrate20pred[:, 100:], cmap = reds, vmin = 0, vmax = 1)
         plt.title("Model: {}_{}_{} | Diff rate pred - 2020".format(config["model"], config["model_n"], config["factors"]))
         plt.colorbar(location = 'right')
-        diff20.savefig(save_path + 'spatial_pred_check_2020_rate.png')
+        diff20.savefig(save_path + 'spatial_pred_check_2020_rate_LMA.png')
     
     
         # pred20 = plt.figure(figsize = (20,16))
@@ -224,7 +225,7 @@ def scatter_plot(pop20, pred):
     
     # save to file
     if config["save"] == True:
-        plt.savefig(save_path + 'scatter_pred_check.png')
+        plt.savefig(save_path + 'scatter_pred_check_LMA.png')
 
 
 
@@ -298,7 +299,7 @@ def density_scatter( pop20 , pred, sort = True, bins = 100, **kwargs )   :
 
     # save to file
     if config["save"] == True:
-        plt.savefig(save_path + 'scatter_density_check.png')
+        plt.savefig(save_path + 'scatter_density_check_LMA.png')
     
         
 
@@ -330,7 +331,7 @@ def error_measures(pop20, pred):
     
     # save in df
     errors_df = pd.DataFrame(errors)
-    errors_df.to_csv(save_path + 'error_measures.csv')
+    errors_df.to_csv(save_path + 'error_measures_LMA.csv')
         
     return mae, rmse, r2, r, pears_r, medae
 

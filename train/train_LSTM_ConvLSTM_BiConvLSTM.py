@@ -42,7 +42,8 @@ config = {
         "save_cp" : True,
         "save_csv" : True,
         "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'ConvGRU'
-        "factors" : 'pop' # 'all', 'static', 'pop'
+        "factors" : 'all', # 'all', 'static', 'pop'
+        "run" : 'run2'
     }
 
 
@@ -127,6 +128,7 @@ def get_valid_record(valid_input, gt, net, factors, device = device):
                 test_img = np.moveaxis(test_img, 2, 0) # (w*h, t, c)
                 test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
                 pred_img = net(test_img[:, :-1, :]) # all except last year
+                # pred_img = pred_img[:, -1, :]
                 pred_img = pred_img[:, 0] # take last year prediction
                 pred_img_list.append(pred_img.cpu().numpy().reshape(256, 256))
             
@@ -176,7 +178,7 @@ class EarlyStopping():
             if self.counter >= self.tolerance:  
                 self.early_stop = True
    
-                
+            
               
 
 def train_ConvGRU(config):
@@ -202,7 +204,7 @@ def train_ConvGRU(config):
     
     if config["model"] == 'ConvLSTM':       
         net = ConvLSTM(input_dim = input_channel,
-                       hidden_dim= 64, #[config['l1'], 1], 
+                       hidden_dim= config['l1'], #[config['l1'], 1], 
                        kernel_size=(3,3), num_layers = 1, # (3,3), num_layers = 2, 
                        batch_first=True, return_all_layers=False)
     
@@ -218,7 +220,7 @@ def train_ConvGRU(config):
                         hidden_dim = config['l1'],
                         num_layers = 1,
                         batch_first = True,
-                        bidirectional = True) # try true
+                        bidirectional = False) # try true
     
     elif config["model"] == 'GRU':
           net = GRU(n_features = input_channel,
@@ -237,6 +239,8 @@ def train_ConvGRU(config):
 
 
     net.to(device)
+    # dir_checkpoint = proj_dir + 'data/ckpts/LSTM_02-20_3y_all/lr0.0012_bs1_1l64_2lna/run2/CP_epoch6.pth'
+    # net.load_state_dict(torch.load(dir_checkpoint))
     
     optimizer = optim.Adam(net.parameters(), lr = config['lr'], betas = (0.9, 0.999))
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2, verbose=True)
@@ -278,14 +282,15 @@ def train_ConvGRU(config):
             
             if conv == False: #config['model'] == 'LSTM':
                 output = net(imgs)
+                #output = output[:, -1, :]
                 loss = criterion(output.view(-1), true_masks[:,-1]) 
                 pred_for_acc = output.detach().numpy()
                 true_masks_for_acc = true_masks[:,-1].detach().numpy()
-                
+
                 
             else:
-                output_list = net(imgs)
-                masks_pred = output_list.squeeze()
+                output = net(imgs)
+                masks_pred = output.squeeze() # (b, dim, t, w, h), dim = 1
 
                 # masks_pred = output_list[0].squeeze() # (b, t, w, h)
                 masks_pred = masks_pred[:,-1,:,:] # last year's prediction
@@ -347,9 +352,9 @@ def train_ConvGRU(config):
 
         print('---------------------------------------------------------------------------------------------------------')
         
-        config["model_n"] = '02-20_3y_bi'
+        # config["model_n"] = '02-20_3y'
         
-        save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"])        
+        save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])        
 
         if config["save_cp"]:
             dir_checkpoint = proj_dir + "data/ckpts/" + save_name
@@ -380,40 +385,89 @@ def train_ConvGRU(config):
             print("Early stopped. We are at epoch:", epoch)
             break
 
-
+    return record_dir
 
 
 
 
 
 print(config)
-early_stopping = EarlyStopping(tolerance=10, min_delta=0.2) 
+early_stopping = EarlyStopping(tolerance=10, min_delta=0.01) 
 
 
-# run with current set of random hyperparameters
-starttime = time.time()
-train_ConvGRU(config)
-time1 = time.time() - starttime
-print(str(time1/3600) + ' h')
+# # run with current set of random hyperparameters
+# starttime = time.time()
+# record_dir = train_ConvGRU(config)
+# time1 = time.time() - starttime
+# hours1 = time1/3600
+# print(str(hours1) + ' h')
+# df = pd.DataFrame({'runtime' : [hours1]})
+# df.to_csv(record_dir + 'runtime.csv')
 
 
 
-# config['model_n'] = 'pop_15-20_1y'
-# starttime2 = time.time()
-# train_ConvGRU(config)
-# time2 = time.time() - starttime2
-# print(str(time2/3600) + ' h')
+#config['run'] = 'run2'
+starttime2 = time.time()
+record_dir = train_ConvGRU(config)
+time2 = time.time() - starttime2
+hours2 = time2/3600
+print(str(hours2) + ' h')
+df = pd.DataFrame({'runtime' : [hours2]})
+df.to_csv(record_dir + 'runtime.csv')
+early_stopping.counter = 0 # reset early stopping
 
 
-# config['model_n'] = 'pop_02-20_2y'
+
+# config['run'] = 'run3'
 # starttime3 = time.time()
-# train_ConvGRU(config)
+# record_dir = train_ConvGRU(config)
 # time3 = time.time() - starttime3
-# print(str(time2/3600) + ' h')
+# hours3 = time3/3600
+# print(str(hours3) + ' h')
+# df = pd.DataFrame({'runtime' : [hours3]})
+# df.to_csv(record_dir + 'runtime.csv')
+# early_stopping.counter = 0 # reset early stopping
 
 
-# config['model_n'] = 'pop_01_20_1y'
+# run BiConvLSTM all
+config['run'] = 'run2'
+config['model'] ='BiConvLSTM'
+starttime2 = time.time()
+record_dir = train_ConvGRU(config)
+time2 = time.time() - starttime2
+hours2 = time2/3600
+print(str(hours2) + ' h')
+df = pd.DataFrame({'runtime' : [hours2]})
+df.to_csv(record_dir + 'runtime.csv')
+early_stopping.counter = 0 # reset early stopping
+
+
+config['run'] = 'run3'
+starttime3 = time.time()
+record_dir = train_ConvGRU(config)
+time3 = time.time() - starttime3
+hours3 = time3/3600
+print(str(hours3) + ' h')
+df = pd.DataFrame({'runtime' : [hours3]})
+df.to_csv(record_dir + 'runtime.csv')
+early_stopping.counter = 0 # reset early stopping
+
+
+# config['run'] = 'run4'
 # starttime4 = time.time()
-# train_ConvGRU(config)
+# record_dir = train_ConvGRU(config)
 # time4 = time.time() - starttime4
-# print(str(time4/3600) + ' h')
+# hours4 = time4/3600
+# print(str(hours4) + ' h')
+# df = pd.DataFrame({'runtime' : [hours4]})
+# df.to_csv(record_dir + 'runtime.csv')
+
+
+# config['run'] = 'run5'
+# starttime5 = time.time()
+# record_dir = train_ConvGRU(config)
+# time5 = time.time() - starttime5
+# hours5 = time5/3600
+# print(str(hours5) + ' h')
+# df = pd.DataFrame({'runtime' : [hours5]})
+# df.to_csv(record_dir + 'runtime.csv')

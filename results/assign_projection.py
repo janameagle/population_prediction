@@ -26,8 +26,8 @@ config = {
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save" : True,
-        "model": 'LSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
-        "factors" : 'all' # 'all', 'static', 'pop'
+        "model": 'random_forest_reg', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
+        "factors" : 'pop' # 'all', 'static', 'pop'
     }
 
 reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False
