@@ -23,7 +23,7 @@ config = {
         "factors" : 'pop' # 'all', 'static', 'pop'
     }
 
-hazard_model_name = 'A'
+hazard_model_name = 'M'
 
 
 reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False

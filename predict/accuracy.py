@@ -5,7 +5,7 @@ Created on Mon May 30 13:39:02 2022
 @author: jmaie
 """
 # data_dir = "H:/Masterarbeit/Code/population_prediction/"
-proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "D:/Masterarbeit/population_prediction/"
 # proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
@@ -25,69 +25,93 @@ config = {
         "l1": 64, #64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
         "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
-        "batch_size": 6, #random.choice([2, 4, 6, 8]),
+        "batch_size": 2, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save" : True,
-        "model": 'LSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
+        "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
         "factors" : 'pop', # 'all', 'static', 'pop'
-        "run" : 'lstmlstm'
+        "run" : 'run3'
     }
 
-conv = False if config['model'] in ['LSTM' , 'GRU'] else True
-if conv == False: # LSTM and GRU
-    config['batch_size'] = 1
 
+
+def main(*kwargs):
+    conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
+    if conv == False: # LSTM and GRU
+        config['batch_size'] = 1
     
-reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False
-
-
-interval = int(config['model_n'][-2])
-lastyear = 20 - interval
-
-save_path = proj_dir + 'data/test/{}_{}_{}/'.format(config['model'], config['model_n'], config['factors'])
-
-if reg == False:
-    save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])
-   
-pred_path =  save_path + "pred_msk_eval_rescaled.npy"
-gt_path = proj_dir + 'data/ori_data/input_all_unnormed.npy'
-
-pred = np.load(pred_path)
-gt = np.load(gt_path)
-
-
-# mask lima region -> island will be removed
-# set negative predicted values to 0
-lima = np.load(proj_dir + 'data/ori_data/lima_ma.npy') # lima_ma is new lima regions
-pred[lima == 0] = np.nan # 0
-pred[pred < 0] = 0
+    global reg    
+    reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False
     
-pop = gt[:,1,:,:] # all years   
-poplast = pop[lastyear-1,:,:] # last input year
-poplast[lima == 0] = np.nan
-pop20 = pop[-1,:,:]
-pop20[lima == 0] = np.nan
+    
+    interval = int(config['model_n'][-2])
+    global lastyear
+    lastyear = 20 - interval
+    
+    global save_path
+    save_path = proj_dir + 'data/test/{}_{}_{}/'.format(config['model'], config['model_n'], config['factors'])
+    
+    if reg == False:
+        save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])
+       
+    pred_path =  save_path + "pred_msk_eval_rescaled.npy"
+    gt_path = proj_dir + 'data/ori_data/input_all_unnormed.npy'
+    
+    pred = np.load(pred_path)
+    gt = np.load(gt_path)
+    
+    
+    # mask lima region -> island will be removed
+    # set negative predicted values to 0
+    lima = np.load(proj_dir + 'data/ori_data/lima_ma.npy') # lima_ma is new lima regions
+    pred[lima == 0] = np.nan # 0
+    pred[pred < 0] = 0
+        
+    pop = gt[:,1,:,:] # all years   
+    poplast = pop[lastyear-1,:,:] # last input year
+    poplast[lima == 0] = np.nan
+    pop20 = pop[-1,:,:]
+    pop20[lima == 0] = np.nan
+    
+    # difference maps to last input year and 2020
+    global difflastpred
+    difflastpred = pred - poplast
+    global diff20pred
+    diff20pred = pred - pop20
+    global diffrate20pred
+    diffrate20pred = (pred - pop20)/pop20
+    np.save(save_path + 'diff20pred.npy', diff20pred)
+    
+    # define colormaps
+    #cmap = 'seismic' # cm.bwr
+    #discrete = cm.tab20c
+    #popcmap = LinearSegmentedColormap.from_list("", ["#fbf4f3", '#fbecc0', "#f9de95", "#f4b43f", "#c64912", "#340f08", "#010000"]) # cm.OrRd
+    popcmap = 'inferno'
+    
+    # colors from red to green
+    global reds
+    reds = cm.get_cmap('Reds', 128)
+    top = cm.get_cmap('Reds_r', 128)
+    bottom = cm.get_cmap('Greens', 128)
+    newcolors = np.vstack((top(np.linspace(0, 1, 128)),
+                           bottom(np.linspace(0, 1, 128))))
+    global diffcmap
+    diffcmap = ListedColormap(newcolors, name='RdGn')
 
-# difference maps to last input year and 2020
-difflastpred = pred - poplast
-diff20pred = pred - pop20
-diffrate20pred = (pred - pop20)/pop20
-np.save(save_path + 'diff20pred.npy', diff20pred)
 
-# define colormaps
-#cmap = 'seismic' # cm.bwr
-#discrete = cm.tab20c
-#popcmap = LinearSegmentedColormap.from_list("", ["#fbf4f3", '#fbecc0', "#f9de95", "#f4b43f", "#c64912", "#340f08", "#010000"]) # cm.OrRd
-popcmap = 'inferno'
 
-# colors from red to green
-reds = cm.get_cmap('Reds', 128)
-top = cm.get_cmap('Reds_r', 128)
-bottom = cm.get_cmap('Greens', 128)
-newcolors = np.vstack((top(np.linspace(0, 1, 128)),
-                       bottom(np.linspace(0, 1, 128))))
-diffcmap = ListedColormap(newcolors, name='RdGn')
+    ###############################################################################
+    # do the plotting
+    ###############################################################################
+    
+    spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
+    
+    # use mask for lima metropolitan area
+    # scatter_plot(pop20[lima==1], pred[lima==1])
+    
+    density_scatter(pop20[lima==1], pred[lima==1])
+
 
 
 
@@ -335,75 +359,20 @@ def error_measures(pop20, pred):
         
     return mae, rmse, r2, r, pears_r, medae
 
-###############################################################################
-# do the plotting
-###############################################################################
-
-spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
-
-# use mask for lima metropolitan area
-# scatter_plot(pop20[lima==1], pred[lima==1])
-
-density_scatter(pop20[lima==1], pred[lima==1])
 
 
 
-
-###############################################################################
-# some testing
-# df = error_measures(pred[pop20>0], pop20[pop20>0])
-# print(df)
-
-
-# pred_clean = pred.copy()
-# pred_clean[pop20 == 0] = 0
-
-# pred_b = pred.copy()
-# pred_b[pred < 0] = -1
-# pred_b[pred == 0] = 0
-# pred_b[pred > 0] = 1
-# plt.imshow(pred_b)
-# plt.colorbar(location = 'right')
-
-# pred_b = pred.copy()
-# pred_b[(pop20 == 0) & (pred > 0)] = 1
-# pred_b[(pop20 == 0) & (pred == 0)] = 0
-# pred_b[pred < 0] = -1
-# pred_b[pop20 > 0] = 2
-# plt.imshow(pred_b)
-# plt.colorbar(location = 'right')
+# run for all models    
+all_models = ['ConvLSTM', 'BiConvLSTM' ] 
+all_factors = ['pop', 'static', 'all']
+runs = ['run4', 'run5']
 
 
-# pred_b = np.zeros((pred.shape[0], pred.shape[1]))
-# pred_b[(pop20 == 0) & (pred > 0)] = 1
-# plt.imshow(pred_b)
-# plt.colorbar(location = 'right')
+for m in all_models:
+    for f in all_factors:
+        for r in runs:
+            config['model'] = m
+            config['factors'] = f
+            config['run'] = r
+            main(config)
 
-# check = diff20pred
-# check[pred_b >= 0] = 0
-# check[check < -20] = -20
-
-# plt.imshow(check)
-# plt.colorbar(location = 'right')
-
-# pop20notnull = pop20[pop20>10]
-# prednotnull = pred[pop20>10]
-
-# scatter_plot(pop20notnull, prednotnull)
-
-# underestimated = np.zeros((pred.shape[0], pred.shape[1]))
-# underestimated[(pred<400) & (pop20 > 400)] = 1
-# overestimated = np.zeros((pred.shape[0], pred.shape[1]))
-# overestimated[(pred>350 )& (pop20 < 350)] = 1
-# plt.imshow(underestimated)
-# plt.imshow(overestimated)
-# negative = np.zeros((pred.shape[0], pred.shape[1]))
-# negative[pred<0] = 1
-# plt.imshow(negative)
-
-# plt.imshow(check[300:400, :])
-# plt.colorbar()
-# plt.show()
-
-# plt.scatter(pop20[320:350,770:820], pred[320:350,770:820])
-# plt.scatter(pop20[320:350,800:850], pred[320:350,800:850])

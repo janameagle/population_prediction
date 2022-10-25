@@ -26,6 +26,7 @@ from utilis.weight_init import weight_init
 import numpy as np
 from livelossplot import PlotLosses # https://github.com/stared/livelossplot/blob/master/examples/pytorch.ipynb
 import matplotlib.pyplot as plt
+from GPUtil import showUtilization as gpu_usage
 from sklearn import metrics
 import csv
 import time
@@ -36,22 +37,25 @@ config = {
         "l1": 64, #64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
         "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
-        "batch_size": 6, #6, #random.choice([2, 4, 6, 8]),
+        "batch_size": 2, #6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save_cp" : True,
         "save_csv" : True,
         "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'ConvGRU'
-        "factors" : 'all', # 'all', 'static', 'pop'
-        "run" : 'run2'
+        "factors" : 'static', # 'all', 'static', 'pop'
+        "run" : 'run3'
     }
 
+print("initial usage")
+gpu_usage()
 
-conv = False if config['model'] in ['LSTM' , 'GRU'] else True
-proj_dir = "H:/Masterarbeit/population_prediction/"
+conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
+# proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = 'D:/Masterarbeit/population_prediction/'
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# device = 'cpu'
+print(device)
 
 
 def evaluate(gt, pred):
@@ -159,7 +163,7 @@ def get_valid_record(valid_input, gt, net, factors, device = device):
             h += 1
 
     val_rmse = evaluate(gt, pred_msk)
-    plt.imshow(pred_msk)
+    # plt.imshow(pred_msk)
 
     return val_rmse #, loss.item()
 
@@ -220,22 +224,22 @@ def train_ConvGRU(config):
                         hidden_dim = config['l1'],
                         num_layers = 1,
                         batch_first = True,
-                        bidirectional = False) # try true
+                        bidirectional = False) 
     
-    elif config["model"] == 'GRU':
-          net = GRU(n_features = input_channel,
+    elif config["model"] == 'BiLSTM':
+          net = MV_LSTM(n_features = input_channel,
                         seq_length = seq_length,
                         hidden_dim = config['l1'],
                         num_layers = 1,
                         batch_first = True,
-                        bidirectional = True) # try true
+                        bidirectional = True)
           
-    elif config["model"] == 'ConvGRU':
-        net = ConvGRU(input_dim = input_channel,
-                      hidden_dim = [config['l1'],1],
-                      kernel_size=(3,3), 
-                      num_layers = 2,
-                      batch_first = True, return_all_layers=False)
+    # elif config["model"] == 'ConvGRU':
+    #     net = ConvGRU(input_dim = input_channel,
+    #                   hidden_dim = [config['l1'],1],
+    #                   kernel_size=(3,3), 
+    #                   num_layers = 2,
+    #                   batch_first = True, return_all_layers=False)
 
 
     net.to(device)
@@ -284,8 +288,8 @@ def train_ConvGRU(config):
                 output = net(imgs)
                 #output = output[:, -1, :]
                 loss = criterion(output.view(-1), true_masks[:,-1]) 
-                pred_for_acc = output.detach().numpy()
-                true_masks_for_acc = true_masks[:,-1].detach().numpy()
+                pred_for_acc = output.detach().cpu().numpy()
+                true_masks_for_acc = true_masks[:,-1].detach().cpu().numpy()
 
                 
             else:
@@ -302,8 +306,8 @@ def train_ConvGRU(config):
 
             # get error
             if conv == True: #config['model'] != 'LSTM':
-                pred_for_acc = masks_pred.reshape(masks_pred.shape[0]*masks_pred.shape[-2]*masks_pred.shape[-1]).detach().numpy()
-                true_masks_for_acc = true_masks[:,-1,:,:].reshape(true_masks.shape[0]*true_masks.shape[-2]*true_masks.shape[-1]).detach().numpy()
+                pred_for_acc = masks_pred.reshape(masks_pred.shape[0]*masks_pred.shape[-2]*masks_pred.shape[-1]).detach().cpu().numpy()
+                true_masks_for_acc = true_masks[:,-1,:,:].reshape(true_masks.shape[0]*true_masks.shape[-2]*true_masks.shape[-1]).detach().cpu().numpy()
 
             
             # mae += metrics.mean_absolute_error(pred_for_acc, true_masks_for_acc)
@@ -315,7 +319,7 @@ def train_ConvGRU(config):
             # train_record['train_loss'] += loss.item()
             train_record['train_rmse'] += batch_rmse
 
-            if i % 5 == 0:
+            if i % 80 == 0:
                 print('Epoch [{} / {}], batch: {}, train loss: {}, train rmse: {}, lr: {}'.format(epoch+1,config["epochs"],i+1,
                                                                                          loss.item(), batch_rmse, optimizer.param_groups[0]['lr']))
             
@@ -391,83 +395,69 @@ def train_ConvGRU(config):
 
 
 
-print(config)
+
 early_stopping = EarlyStopping(tolerance=10, min_delta=0.01) 
 
 
 # # run with current set of random hyperparameters
+all_models = ['ConvLSTM', 'BiConvLSTM']
+all_factors = ['pop', 'static', 'all']
+runs = ['run4', 'run5']
+
+
+for m in all_models:
+    for f in all_factors:
+        for r in runs:
+            config['model'] = m
+            config['factors'] = f
+            config['run'] = r
+            print(config)
+            starttime = time.time()
+            record_dir = train_ConvGRU(config)
+            hours = (time.time() - starttime)/3600
+            df = pd.DataFrame({'runtime' : [hours]})
+            df.to_csv(record_dir + 'runtime.csv')
+            early_stopping.counter = 0 # reset early stopping
+
+
+# config['model'] = 'LSTM'
+# config['factors'] = 'pop'
+# config['run'] = 'run4'
+# print(config)
 # starttime = time.time()
 # record_dir = train_ConvGRU(config)
-# time1 = time.time() - starttime
-# hours1 = time1/3600
-# print(str(hours1) + ' h')
-# df = pd.DataFrame({'runtime' : [hours1]})
-# df.to_csv(record_dir + 'runtime.csv')
-
-
-
-#config['run'] = 'run2'
-starttime2 = time.time()
-record_dir = train_ConvGRU(config)
-time2 = time.time() - starttime2
-hours2 = time2/3600
-print(str(hours2) + ' h')
-df = pd.DataFrame({'runtime' : [hours2]})
-df.to_csv(record_dir + 'runtime.csv')
-early_stopping.counter = 0 # reset early stopping
-
-
-
-# config['run'] = 'run3'
-# starttime3 = time.time()
-# record_dir = train_ConvGRU(config)
-# time3 = time.time() - starttime3
-# hours3 = time3/3600
-# print(str(hours3) + ' h')
-# df = pd.DataFrame({'runtime' : [hours3]})
+# hours = (time.time() - starttime)/3600
+# print(str(hours) + ' h')
+# df = pd.DataFrame({'runtime' : [hours]})
 # df.to_csv(record_dir + 'runtime.csv')
 # early_stopping.counter = 0 # reset early stopping
 
 
-# run BiConvLSTM all
-config['run'] = 'run2'
-config['model'] ='BiConvLSTM'
-starttime2 = time.time()
-record_dir = train_ConvGRU(config)
-time2 = time.time() - starttime2
-hours2 = time2/3600
-print(str(hours2) + ' h')
-df = pd.DataFrame({'runtime' : [hours2]})
-df.to_csv(record_dir + 'runtime.csv')
-early_stopping.counter = 0 # reset early stopping
-
-
-config['run'] = 'run3'
-starttime3 = time.time()
-record_dir = train_ConvGRU(config)
-time3 = time.time() - starttime3
-hours3 = time3/3600
-print(str(hours3) + ' h')
-df = pd.DataFrame({'runtime' : [hours3]})
-df.to_csv(record_dir + 'runtime.csv')
-early_stopping.counter = 0 # reset early stopping
-
-
-# config['run'] = 'run4'
-# starttime4 = time.time()
-# record_dir = train_ConvGRU(config)
-# time4 = time.time() - starttime4
-# hours4 = time4/3600
-# print(str(hours4) + ' h')
-# df = pd.DataFrame({'runtime' : [hours4]})
-# df.to_csv(record_dir + 'runtime.csv')
-
-
+# config['model'] = 'LSTM'
+# config['factors'] = 'pop'
 # config['run'] = 'run5'
-# starttime5 = time.time()
+# print(config)
+# starttime = time.time()
 # record_dir = train_ConvGRU(config)
-# time5 = time.time() - starttime5
-# hours5 = time5/3600
-# print(str(hours5) + ' h')
-# df = pd.DataFrame({'runtime' : [hours5]})
+# hours = (time.time() - starttime)/3600
+# print(str(hours) + ' h')
+# df = pd.DataFrame({'runtime' : [hours]})
 # df.to_csv(record_dir + 'runtime.csv')
+# early_stopping.counter = 0 # reset early stopping
+
+
+# config['model'] = 'LSTM'
+# config['factors'] = 'static'
+# config['run'] = 'run4'
+# print(config)
+# starttime = time.time()
+# record_dir = train_ConvGRU(config)
+# hours = (time.time() - starttime)/3600
+# print(str(hours) + ' h')
+# df = pd.DataFrame({'runtime' : [hours]})
+# df.to_csv(record_dir + 'runtime.csv')
+# early_stopping.counter = 0 # reset early stopping
+
+
+
+
