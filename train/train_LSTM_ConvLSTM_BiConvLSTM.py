@@ -39,12 +39,12 @@ config = {
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
         "batch_size": 2, #6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : '02-20_3y',
+        "model_n" : '04-20_4y', # 02-20_2y, 01-20_1y
         "save_cp" : True,
         "save_csv" : True,
-        "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'ConvGRU'
-        "factors" : 'static', # 'all', 'static', 'pop'
-        "run" : 'run3'
+        "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'ConvGRU'
+        "factors" : 'pop', # 'all', 'static', 'pop'
+        "run" : 'run1'
     }
 
 print("initial usage")
@@ -54,7 +54,8 @@ conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
 # proj_dir = "H:/Masterarbeit/population_prediction/"
 proj_dir = 'D:/Masterarbeit/population_prediction/'
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'
 print(device)
 
 
@@ -188,7 +189,6 @@ class EarlyStopping():
 def train_ConvGRU(config):
     if conv == False: # LSTM and GRU
         config['batch_size'] = 1
-        seq_length = 5
     
     liveloss = PlotLosses()
     train_dir = proj_dir + "data/train/"
@@ -199,6 +199,11 @@ def train_ConvGRU(config):
     # ori_data_dir = proj_dir + 'data/ori_data/input_all_20y_4c_no_na_oh_norm_buf.npy'
     valid_input, gt = get_valid_dataset(ori_data_dir, config['model_n'])
     
+    
+    if conv == False: # LSTM and GRU
+        seq_length = valid_input.shape[0]-1
+        
+        
     # for testing
     # ori_dir2 = proj_dir + 'data/ori_data/input_all_20y_4c_no_na_oh_norm_buf.npy'
     # vi,gt2 = get_valid_dataset(ori_dir2, config['model_n'])
@@ -400,16 +405,17 @@ early_stopping = EarlyStopping(tolerance=10, min_delta=0.01)
 
 
 # # run with current set of random hyperparameters
-all_models = ['ConvLSTM', 'BiConvLSTM']
-all_factors = ['pop', 'static', 'all']
-runs = ['run4', 'run5']
+all_models = ['BiLSTM']
+all_factors = ['pop']
+all_modeln = ['01-20_1y'] 
+runs = ['run1', 'run2', 'run3', 'run4', 'run5']
 
 
 for m in all_models:
-    for f in all_factors:
+    for n in all_modeln:
         for r in runs:
             config['model'] = m
-            config['factors'] = f
+            config['model_n'] = n
             config['run'] = r
             print(config)
             starttime = time.time()
@@ -420,9 +426,8 @@ for m in all_models:
             early_stopping.counter = 0 # reset early stopping
 
 
-# config['model'] = 'LSTM'
-# config['factors'] = 'pop'
-# config['run'] = 'run4'
+
+
 # print(config)
 # starttime = time.time()
 # record_dir = train_ConvGRU(config)

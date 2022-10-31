@@ -4,7 +4,7 @@ Created on Wed Oct 19 10:48:25 2022
 
 @author: maie_ja
 """
-proj_dir = 'H:/Masterarbeit/population_prediction/'
+proj_dir = 'D:/Masterarbeit/population_prediction/'
 
 import rasterio
 import matplotlib.pyplot as plt
@@ -27,15 +27,15 @@ config = {
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save" : True,
-        "model": 'random_forest_reg', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
+        "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
         "factors" : 'pop', # 'all', 'static', 'pop',
-        "run" : 'run1'
+        "run" : 'run2'
     }
 
 hazard_model_name = 'M'
 
 reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False
-conv = False if config['model'] in ['LSTM' , 'GRU'] else True
+conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
 if conv == False: # LSTM and GRU
     config['batch_size'] = 1
     
@@ -44,14 +44,15 @@ if reg == False:
     save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"], config['run'])
    
     
-rf_path = proj_dir + 'data/test/{}_{}_{}/'.format('random_forest_reg', config['model_n'],config['factors'])  
-lstm_path = proj_dir + 'data/test/{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format('LSTM', config['model_n'], config['factors'],
-                                                                           config["lr"], 1, config["l1"], config["l2"], config['run'])   
+#rf_path = proj_dir + 'data/test/{}_{}_{}/'.format('random_forest_reg', config['model_n'],config['factors'])  
+lstm_path = proj_dir + 'data/test/{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format('BiLSTM', config['model_n'], 'pop',
+                                                                           config["lr"], 1, config["l1"], config["l2"], 'run2')   
+multiv_path = proj_dir + 'data/test/{}_{}_{}/'.format('multivariate_reg', config['model_n'], 'static') 
 
 # for comparison of best model and base model
-rf_pred = rasterio.open(rf_path + 'pred.tif').read(1)
-lstm_pred = rasterio.open(lstm_path + 'pred.tif').read(1)
-
+#rf_pred = rasterio.open(rf_path + 'pred.tif').read(1)
+bilstm_pred = rasterio.open(lstm_path + 'pred.tif').read(1)
+multiv_pred = rasterio.open(multiv_path + 'pred.tif').read(1)
 
 
 
@@ -85,7 +86,11 @@ pred = rasterio.open(save_path + 'pred.tif').read(1).astype(int)
 
 # convert to dataframe
 df_all = pd.DataFrame({'pgm': pgm.reshape(-1),
-                   'pred': pred.reshape(-1)
+                    'pop20': pop20.reshape(-1),
+                    # 'rf': rf_pred.reshape(-1),
+                    'multiv': multiv_pred.reshape(-1),
+                   'bilstm': bilstm_pred.reshape(-1),
+                   # 'pop17': pop17.reshape(-1),
                    })
 
 df = df_all.groupby(df_all['pgm']).aggregate('sum')
@@ -103,7 +108,7 @@ def millions(x, pos):
 formatter = FuncFormatter(millions)
 
 df.plot.bar(rot=90)
-ax.yaxis.set_major_formatter(formatter)
+# plt.yaxis.set_major_formatter(formatter)
 plt.xlabel('Peak Ground Motion')
 plt.ylabel('Predicted population')
 plt.title('Predicted Population affected by earthquake')
@@ -125,8 +130,9 @@ plt.show()
 # difference barchart
 
 df_diffs = pd.DataFrame({'pgm': pgm.reshape(-1),
-                         'lstm': lstm_pred.reshape(-1) - pop20.reshape(-1),
-                         'random forest': rf_pred.reshape(-1) - pop20.reshape(-1)
+                         'bilstm': bilstm_pred.reshape(-1) - pop20.reshape(-1),
+                         # 'random forest': rf_pred.reshape(-1) - pop20.reshape(-1),
+                         'multiv': multiv_pred.reshape(-1) - pop20.reshape(-1)
                          })
 df_diffs = df_diffs.groupby(df_diffs['pgm']).aggregate('sum')
 
@@ -164,9 +170,12 @@ pred = rasterio.open(save_path + 'pred.tif').read(1).astype(int)
 
 # convert to dataframe
 df_all = pd.DataFrame({'fd': fd.reshape(-1),
-                   'pred': pred.reshape(-1),
-                   'pop17': pop17.reshape(-1),
-                   'pop20': pop20.reshape(-1)})
+                    'pop20': pop20.reshape(-1),
+                    # 'rf': rf_pred.reshape(-1),
+                    'multiv': multiv_pred.reshape(-1),
+                   'bilstm': bilstm_pred.reshape(-1),
+                   # 'pop17': pop17.reshape(-1),
+                   })
 
 df = df_all.groupby(df_all['fd']).aggregate('sum')
 df = df.drop(0)
@@ -174,16 +183,16 @@ df = df.drop(0)
 
 # https://realpython.com/pandas-plot-python/
 #######################################################
-# barchart
-df.plot.bar(rot=90)
+# # barchart
+# df.plot.bar(rot=90)
 
 
-fig, ax = plt.subplots(figsize=(10, 4))
-ax.bar(df.index.values, df.pred)
-plt.xlabel('Maximum FLow Depth')
-plt.ylabel('Predicted population')
-plt.title('Predicted Population affected by tsunami')
-plt.show()
+# fig, ax = plt.subplots(figsize=(10, 4))
+# ax.bar(df.index.values, df.pred)
+# plt.xlabel('Maximum FLow Depth')
+# plt.ylabel('Predicted population')
+# plt.title('Predicted Population affected by tsunami')
+# plt.show()
 
 
 # bins
@@ -202,8 +211,9 @@ plt.show()
 # difference barchart
 
 df_diffs_fd = pd.DataFrame({'fd': fd.reshape(-1),
-                         'lstm': lstm_pred.reshape(-1) - pop20.reshape(-1),
-                         'random forest': rf_pred.reshape(-1) - pop20.reshape(-1)
+                         'bilstm': bilstm_pred.reshape(-1) - pop20.reshape(-1),
+                         # 'random forest': rf_pred.reshape(-1) - pop20.reshape(-1),
+                         'multiv': multiv_pred.reshape(-1) - pop20.reshape(-1)
                          })
 df_diffs_fd = df_diffs_fd.groupby(df_diffs_fd['fd']).aggregate('sum')
 df_diffs_fd_groups = df_diffs_fd.groupby(np.digitize(df_diffs_fd.index.values, bins)).aggregate('sum')
@@ -212,7 +222,7 @@ df_diffs_fd_groups = df_diffs_fd_groups.drop(0)
 
 
 df_diffs_fd_groups.plot.bar(rot=90)
-plt.xlabel('Peak Ground Motion')
+plt.xlabel('Maximum Flow Depth')
 plt.ylabel('Falsely predicted population')
 plt.title('Falsely predicted population affected by tsunami')
 plt.legend(title='Model')
@@ -227,58 +237,58 @@ plt.show()
 
 
 
-# ######################################################
-# spatial analysis
-from matplotlib import pyplot
-from rasterio.plot import show
-import earthpy.spatial as es
-import earthpy.plot as ep
+# # ######################################################
+# # spatial analysis
+# from matplotlib import pyplot
+# from rasterio.plot import show
+# import earthpy.spatial as es
+# import earthpy.plot as ep
 
 
-rf_pred = rasterio.open(rf_path + 'pred.tif')
-zeros = np.zeros((888,888))
+# rf_pred = rasterio.open(rf_path + 'pred.tif')
+# zeros = np.zeros((888,888))
 
-out_img = save_path + 'pgm_rf_stack.tif'
-out_meta = rf_pred.meta.copy()
-out_meta.update({'count': 3})
+# out_img = save_path + 'pgm_rf_stack.tif'
+# out_meta = rf_pred.meta.copy()
+# out_meta.update({'count': 3})
 
-# stack the pred and pop as two bands and save as file
-file_list = [pgm, pred, zeros]
-with rasterio.open(out_img, 'w', **out_meta) as dest:
-    for band_nr, src in enumerate(file_list, start=1):
-        dest.write(src, band_nr)
+# # stack the pred and pop as two bands and save as file
+# file_list = [pgm, pred, zeros]
+# with rasterio.open(out_img, 'w', **out_meta) as dest:
+#     for band_nr, src in enumerate(file_list, start=1):
+#         dest.write(src, band_nr)
 
-stack = rasterio.open(rf_path + 'pgm_rf_stack.tif')
-img = stack.read(3)
-img[np.isnan(img)] = 0
-img_new = img # (pop, pgm, zeros)
-img_new[0,:,:] = img[1,:,:]
-img_new[1,:,:] = img[2,:,:]
-img_new[2,:,:] = img[0,:,:] # (pgm, zeros, pop)
-image_norm = (img_new - img_new.min()) / (img_new.max() - img_new.min())
-show(image_norm[2])
-show(img[0])
+# stack = rasterio.open(rf_path + 'pgm_rf_stack.tif')
+# img = stack.read(3)
+# img[np.isnan(img)] = 0
+# img_new = img # (pop, pgm, zeros)
+# img_new[0,:,:] = img[1,:,:]
+# img_new[1,:,:] = img[2,:,:]
+# img_new[2,:,:] = img[0,:,:] # (pgm, zeros, pop)
+# image_norm = (img_new - img_new.min()) / (img_new.max() - img_new.min())
+# show(image_norm[2])
+# show(img[0])
 
 
-# with rasterio.open(proj_dir + 'data/ori_data/pop20.tif', 'w', **out_meta) as dest:
-#     dest.write(pop20, 1)
-# with rasterio.open(proj_dir + 'data/ori_data/zeros.tif', 'w', **out_meta) as dest:
-#     dest.write(zeros, 1)
-# pop20_pth = proj_dir + 'data/ori_data/pop20.tif'
-pgm_pth = hazard_dir + hazard_model + '_rep_int.tif'
-rf_pth = rf_path + 'pred.tif'
-zeros_pth = proj_dir + 'data/ori_data/zeros.tif'
+# # with rasterio.open(proj_dir + 'data/ori_data/pop20.tif', 'w', **out_meta) as dest:
+# #     dest.write(pop20, 1)
+# # with rasterio.open(proj_dir + 'data/ori_data/zeros.tif', 'w', **out_meta) as dest:
+# #     dest.write(zeros, 1)
+# # pop20_pth = proj_dir + 'data/ori_data/pop20.tif'
+# pgm_pth = hazard_dir + hazard_model + '_rep_int.tif'
+# rf_pth = rf_path + 'pred.tif'
+# zeros_pth = proj_dir + 'data/ori_data/zeros.tif'
 
-file_list = [pgm_pth, zeros_pth, rf_pth]
+# file_list = [pgm_pth, zeros_pth, rf_pth]
 
-stack, meta = es.stack(file_list, nodata = None)
-# stack[:,lima==0] = np.nan
-# ep.plot_rgb(stack)
-image_norm = stack.copy()
-image_norm[0] = (stack[0] - 191) / (219 - 191)
-image_norm[2] = (stack[2] - 0) / (200 - 0)
-image_norm[:,lima==0] = np.nan
-show(image_norm)
+# stack, meta = es.stack(file_list, nodata = None)
+# # stack[:,lima==0] = np.nan
+# # ep.plot_rgb(stack)
+# image_norm = stack.copy()
+# image_norm[0] = (stack[0] - 191) / (219 - 191)
+# image_norm[2] = (stack[2] - 0) / (200 - 0)
+# image_norm[:,lima==0] = np.nan
+# show(image_norm)
 
 
 # pgm = pgm.astype(np.float32)

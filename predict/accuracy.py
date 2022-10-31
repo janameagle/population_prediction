@@ -29,9 +29,9 @@ config = {
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save" : True,
-        "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
+        # "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
         "factors" : 'pop', # 'all', 'static', 'pop'
-        "run" : 'run3'
+        # "run" : 'run3'
     }
 
 
@@ -361,18 +361,18 @@ def error_measures(pop20, pred):
 
 
 
-
 # run for all models    
-all_models = ['ConvLSTM', 'BiConvLSTM' ] 
-all_factors = ['pop', 'static', 'all']
-runs = ['run4', 'run5']
+all_models = ['BiLSTM'] #, 'BiConvLSTM' ] 
+all_factors = ['pop'] #, 'static', 'all']
+all_modeln = ['01-20_1y'] #, '04-20_4y'] 
+runs = ['run1', 'run2'] #, 'run3', 'run4', 'run5']
 
 
 for m in all_models:
-    for f in all_factors:
+    for n in all_modeln:
         for r in runs:
             config['model'] = m
-            config['factors'] = f
+            config['model_n'] = n
             config['run'] = r
             main(config)
 

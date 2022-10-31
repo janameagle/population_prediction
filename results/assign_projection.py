@@ -10,7 +10,7 @@ Created on Wed Sep 28 13:25:22 2022
 # district boundaries from https://data.humdata.org/dataset/cod-ab-per
 
 
-proj_dir = "H:/Masterarbeit/population_prediction/"
+proj_dir = "D:/Masterarbeit/population_prediction/"
 
 
 import numpy as np
@@ -27,18 +27,19 @@ config = {
         "model_n" : '02-20_3y',
         "save" : True,
         "model": 'random_forest_reg', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
-        "factors" : 'pop' # 'all', 'static', 'pop'
+        "factors" : 'static', # 'all', 'static', 'pop'
+        "run" : 'run2' 
     }
 
 reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False
-conv = False if config['model'] in ['LSTM' , 'GRU'] else True
+conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
 if conv == False: # LSTM and GRU
     config['batch_size'] = 1
     
 save_path = proj_dir + 'data/test/{}_{}_{}/'.format(config['model'], config['model_n'], config['factors'])
 
 if reg == False:
-    save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"])
+    save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"], config['run'])
    
 pred_path =  save_path + "pred_msk_eval_rescaled.npy"
 diff_path = save_path + "diff20pred.npy"

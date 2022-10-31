@@ -25,11 +25,11 @@ config = {
         "lr": 0.0012, 
         "batch_size": 2, 
         "epochs": 50, #50
-        "model_n" : '02-20_3y',
+        "model_n" : '02-20_2y',
         "save" : True,
-        "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', ('linear_reg', 'multivariate_reg',' 'random_forest_reg')
+        # "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', ('linear_reg', 'multivariate_reg',' 'random_forest_reg')
         "factors" : 'pop', # 'all', 'static', 'pop'
-        "run" : 'run3'
+        # "run" : 'run3'
     }
 
 
@@ -63,14 +63,13 @@ def main(*kwargs):
     conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
     if conv == False: # LSTM and GRU
         config['batch_size'] = 1
-        seq_length = 5
         
         
     save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])        
 
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'
     
     ori_data_dir = proj_dir + 'data/ori_data/input_all.npy'
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
@@ -78,16 +77,16 @@ def main(*kwargs):
     if config['model_n'] == '02-20_3y':
         valid_input = ori_data[[7,10,13,16,19], :, :, :] # years 2005-2020, 3y interval
           
-    elif config['model_n'] == '01-20_4y':
-        valid_input = ori_data[[7,11,15,19], :, :, :] # years 2004-2020, 4y interval
+    elif config['model_n'] == '04-20_4y':
+        valid_input = ori_data[[11,15,19], :, :, :] # years 2004-2020, 4y interval
         # valid_input = valid_input[:,[1,3,4,5,6],:,:]              # static input features
         
     elif config['model_n'] == '02-20_2y':
-        valid_input = ori_data[[3,5,7,9,11,13,15,17,19], :, :, :] # years 2004-2020, 2y interval
+        valid_input = ori_data[[5,7,9,11,13,15,17,19], :, :, :] # years 2006-2020, 2y interval
         # valid_input = valid_input[:,[1,3,4,5,6],:,:]                        # static input features
         
-    elif config['model_n'] == '01_20_1y':
-        valid_input = ori_data[1:, :, :, :] # years 2002-2020, 1y interval
+    elif config['model_n'] == '01-20_1y':
+        valid_input = ori_data[2:, :, :, :] # years 2002-2020, 1y interval
         # valid_input = valid_input[:,[1,3,4,5,6],:,:]  # static input features
     
     
@@ -102,12 +101,13 @@ def main(*kwargs):
     
     gt = ori_data[-1, 1, :, :] # last year, population
     
+    if conv == False: # LSTM and GRU
+        seq_length = valid_input.shape[0]
+        
     input_channel = 10 if config['factors'] == 'all' else 5 if config['factors'] == 'static' else 1
             
     
                 
-    df = pd.DataFrame()
-    valid_record = {'mae': 0, 'rmse': 0}
     dir_checkpoint = proj_dir + 'data/ckpts/' + save_name + 'CP_epoch{}.pth'.format(config["epochs"]-1)        
     
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
@@ -231,17 +231,18 @@ def main(*kwargs):
     
 
 
-# # run for all models    
-# all_models = ['LSTM', 'BiLSTM' ] #,'ConvLSTM', 'BiConvLSTM']
-# all_factors = ['pop', 'static', 'all']
-# runs = ['run4', 'run5']
+# run for all models    
+all_models = ['BiLSTM'] #, 'BiConvLSTM' ] 
+all_factors = ['pop'] #, 'static', 'all']
+all_modeln = ['01-20_1y'] 
+runs = ['run1', 'run2', 'run3'] #, 'run4', 'run5']
 
 
-# for m in all_models:
-#     for f in all_factors:
-#         for r in runs:
-#             config['model'] = m
-#             config['factors'] = f
-#             config['run'] = r
-#             main(config)
-main(config)
+for m in all_models:
+    for n in all_modeln:
+        for r in runs:
+            config['model'] = m
+            config['model_n'] = n
+            config['run'] = r
+            main(config)
+

@@ -1,23 +1,31 @@
 import numpy as np
-import argparse
 import os
 import torch
 from tqdm import tqdm
 from torch.autograd import Variable
-import cv2
-from sklearn.metrics import cohen_kappa_score
-from sklearn.metrics import accuracy_score
-import pandas as pd
-from model.v_convlstm import ConvLSTM
+from model.v_lstm import MV_LSTM
 from sklearn.preprocessing import MinMaxScaler
-import torch.nn as nn
-from sklearn import metrics
 import matplotlib.pyplot as plt
+import tifffile
 
 
 
-proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
+proj_dir = "D:/Masterarbeit/population_prediction/"
+
+# define config
+config = {
+        "l1": 64, 
+        "l2": 'na', 
+        "lr": 0.0012, 
+        "batch_size": 2, 
+        "epochs": 50, #50
+        "model_n" : '02-20_2y',
+        "save" : True,
+        "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', ('linear_reg', 'multivariate_reg',' 'random_forest_reg')
+        "factors" : 'pop', # 'all', 'static', 'pop'
+        "run" : 'run5',
+        "forecast": 28
+    }
 
 
 def get_subsample_centroids(img, img_size=50):
@@ -39,116 +47,135 @@ def get_subsample_centroids(img, img_size=50):
 
 
 
-def get_args():
-    parser = argparse.ArgumentParser(description='Train ConvLSTM Models', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-epoch', '--epoch', default=15, type=int, dest='epoch')
-    parser.add_argument('-lr', '--learn_rate', default=8e-4, type=float, dest='learn_rate')
-    parser.add_argument('-f', '--n_features', default=4, type=int, dest='n_features')
-    parser.add_argument('-b', '--batch_size', default=12, type=int, nargs='?', help='Batch size', dest='batch_size') #5
-    parser.add_argument('-n', '--n_layer', default=3, type=int, dest='n_layer')
-    parser.add_argument('-l', '--seq_len', default=4, type=int, dest='seq_len')
-    parser.add_argument('-is', '--input_shape', default=(256, 256), type=tuple, dest='input_shape')
-    return parser.parse_args()
+def main(*kwargs):
+    conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
+    if conv == False: # LSTM and GRU
+        config['batch_size'] = 1
 
-n_years = 20
-n_classes = 4
-# define config
-config = {
-        "l1": 64,
-        "l2": 'na',
-        "lr": 0.0012,
-        "batch_size": 6,
-        "epochs": 41, # 50
-        "model_n" : 'pop_only_01_20_1y_frc22'}
+        
+        
+    save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])        
 
-
-
-
-if __name__ == '__main__':
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # device = 'cpu'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-    args = get_args()
-
-    bias_status = True
-
-    ori_data_dir = proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh_norm.npy'
-
     
+    ori_data_dir = proj_dir + 'data/ori_data/input_all.npy'
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
-    processed_ori_data = ori_data
-    #valid_input = processed_ori_data[[3,7,11,15], 1:, :, :] # 2004-2016, 4y interval, no lc unnormed
-    # valid_input = processed_ori_data[[7,10,13,16], 1:, :, :] # 2008-2017 , 3y interval, no lc unnormed
-    # valid_input = processed_ori_data[[11,13,15,17], 1:, :, :] # 2012-2018 , 2y interval, no lc unnormed
-    # valid_input = processed_ori_data[[15,16,17,18], 1:, :, :] # 2016-2019 , 1y interval, no lc unnormed
-    if config['model_n'] == 'pop_only_01_20_1y':
-        valid_input = processed_ori_data[1:-1, 1, :, :] # years 2002-2020, 1y interval
-        
-    elif config['model_n'] == 'pop_only_01_20_4y_frc24':
-        valid_input = processed_ori_data[[7,11,15,19], 1, :, :] # years 2008-2020, 4y interval
-        
-    elif config['model_n'] == 'pop_only_01_20_4y_frc28':
-        valid_input = processed_ori_data[[11,15,19], 1, :, :] # years 2008-2020, 4y interval
-        save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
-        year24 = np.load(proj_dir + "data/test/pop_only_01_20_4y_frc24/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
-        valid_input = np.concatenate((valid_input, year24[np.newaxis,:,:]), axis=0)
-        
-    elif config['model_n'] == 'pop_only_01_20_4y_frc32':
-        valid_input = processed_ori_data[[15,19], 1, :, :] # years 2008-2020, 4y interval
-        year24 = np.load(proj_dir + "data/test/pop_only_01_20_4y_frc24/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
-        year28 = np.load(proj_dir + "data/test/pop_only_01_20_4y_frc28/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
-        valid_input = np.concatenate((valid_input, year24[np.newaxis,:,:], year28[np.newaxis,:,:]), axis=0)
-        
-    elif config['model_n'] == 'pop_only_01_20_1y_frc21':
-        valid_input = processed_ori_data[2:, 1, :, :] # years 2008-2020, 4y interval
-        
-    elif config['model_n'] == 'pop_only_01_20_1y_frc22':
-        valid_input = processed_ori_data[3:, 1, :, :] # years 2008-2020, 4y interval
-        save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
-        year21 = np.load(proj_dir + "data/test/pop_only_01_20_1y_frc21/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
-        valid_input = np.concatenate((valid_input, year21[np.newaxis,:,:]), axis=0)
-        
-    elif config['model_n'] == 'pop_only_01_20_1y_frc23':
-        valid_input = processed_ori_data[4:, 1, :, :] # years 2008-2020, 4y interval
-        year21 = np.load(proj_dir + "data/test/pop_only_01_20_1y_frc21/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
-        year22 = np.load(proj_dir + "data/test/pop_only_01_20_1y_frc22/lr{}_bs{}_1l{}_2l{}/pred_msk_eval_normed.npy".format(config["lr"], config["batch_size"], config["l1"], config["l2"]))
-        valid_input = np.concatenate((valid_input, year21[np.newaxis,:,:], year22[np.newaxis,:,:]), axis=0)
-        
     
-    input_channel = 1 # 19
+    if config['model_n'] == '02-20_3y':     
+        if config['forecast'] == 23:
+            valid_input = ori_data[[7,10,13,16,19], 1, :, :] # 2008 - 2020, 3y
+        
+        if config['forecast'] == 26:
+            valid_input = ori_data[[10,13,16,19], 1, :, :] # 2011 - 2020, 3y
+            y23 = np.load(proj_dir + 'data/test/' + save_name + 'frc23/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y23[np.newaxis,:,:]), axis=0)
+            
+        if config['forecast'] == 29:
+            valid_input = ori_data[[13,16,19], 1, :, :] # 2014 - 2020, 3y
+            y23 = np.load(proj_dir + 'data/test/' + save_name + 'frc23/pred_msk_eval_normed.npy')
+            y26 = np.load(proj_dir + 'data/test/' + save_name + 'frc26/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y23[np.newaxis,:,:], y26[np.newaxis,:,:]), axis=0)
+            
+        if config['forecast'] == 32:
+            valid_input = ori_data[[16,19], 1, :, :] # 2017 - 2020, 3y
+            y23 = np.load(proj_dir + 'data/test/' + save_name + 'frc23/pred_msk_eval_normed.npy')
+            y26 = np.load(proj_dir + 'data/test/' + save_name + 'frc26/pred_msk_eval_normed.npy')
+            y29 = np.load(proj_dir + 'data/test/' + save_name + 'frc29/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y23[np.newaxis,:,:], y26[np.newaxis,:,:], y29[np.newaxis,:,:]), axis=0)
+            
+        if config['forecast'] == 35:
+            valid_input = ori_data[[19], 1, :, :] # 2020
+            y23 = np.load(proj_dir + 'data/test/' + save_name + 'frc23/pred_msk_eval_normed.npy')
+            y26 = np.load(proj_dir + 'data/test/' + save_name + 'frc26/pred_msk_eval_normed.npy')
+            y29 = np.load(proj_dir + 'data/test/' + save_name + 'frc29/pred_msk_eval_normed.npy')
+            y32 = np.load(proj_dir + 'data/test/' + save_name + 'frc32/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y23[np.newaxis,:,:], y26[np.newaxis,:,:], y29[np.newaxis,:,:], y32[np.newaxis,:,:]), axis=0)
+     
+        
+    if config['model_n'] == '02-20_2y':     
+        if config['forecast'] == 22:
+            valid_input = ori_data[[5,7,9,11,13,15,17,19], 1, :, :] 
+        
+        if config['forecast'] == 24:
+            valid_input = ori_data[[7,9,11,13,15,17,19], 1, :, :] 
+            y22 = np.load(proj_dir + 'data/test/' + save_name + 'frc22/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y22[np.newaxis,:,:]), axis=0)
+            
+        if config['forecast'] == 26:
+            valid_input = ori_data[[9,11,13,15,17,19], 1, :, :] 
+            y22 = np.load(proj_dir + 'data/test/' + save_name + 'frc22/pred_msk_eval_normed.npy')
+            y24 = np.load(proj_dir + 'data/test/' + save_name + 'frc24/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y22[np.newaxis,:,:], y24[np.newaxis,:,:]), axis=0)
+            
+        if config['forecast'] == 28:
+            valid_input = ori_data[[11,13,15,17,19], 1, :, :] 
+            y22 = np.load(proj_dir + 'data/test/' + save_name + 'frc22/pred_msk_eval_normed.npy')
+            y24 = np.load(proj_dir + 'data/test/' + save_name + 'frc24/pred_msk_eval_normed.npy')
+            y26 = np.load(proj_dir + 'data/test/' + save_name + 'frc26/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y22[np.newaxis,:,:], y24[np.newaxis,:,:], y26[np.newaxis,:,:]), axis=0)
+            
+        if config['forecast'] == 30:
+            valid_input = ori_data[[13,15,17,19], 1, :, :] 
+            y22 = np.load(proj_dir + 'data/test/' + save_name + 'frc22/pred_msk_eval_normed.npy')
+            y24 = np.load(proj_dir + 'data/test/' + save_name + 'frc24/pred_msk_eval_normed.npy')
+            y26 = np.load(proj_dir + 'data/test/' + save_name + 'frc26/pred_msk_eval_normed.npy')
+            y28 = np.load(proj_dir + 'data/test/' + save_name + 'frc28/pred_msk_eval_normed.npy')
+            valid_input = np.concatenate((valid_input, y22[np.newaxis,:,:], y24[np.newaxis,:,:], y26[np.newaxis,:,:], y28[np.newaxis,:,:]), axis=0)
+        
+    if conv == False: # LSTM and GRU
+        seq_length = valid_input.shape[0]
+        
+    input_channel = 10 if config['factors'] == 'all' else 5 if config['factors'] == 'static' else 1
+        
 
-    df = pd.DataFrame()
-
-    dir_checkpoint = proj_dir + "data/ckpts/pop_only_01_20_1y/lr{}_bs{}_1l{}_2l{}/CP_epoch{}.pth".format(config["lr"], config["batch_size"], config["l1"], config["l2"], config["epochs"]-1)
+    dir_checkpoint = proj_dir + 'data/ckpts/' + save_name + 'CP_epoch{}.pth'.format(config["epochs"]-1)        
     
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
 
     sub_img_list = []
     for x, y in zip(x_list, y_list):
-        sub_img = valid_input[:, x - 128:x + 128, y - 128:y + 128]
+        if config['factors'] == 'pop':
+            sub_img = valid_input[:, np.newaxis, x - 128:x + 128, y - 128:y + 128]
+        else:
+            sub_img = valid_input[:, :, x - 128:x + 128, y - 128:y + 128]
         sub_img_list.append(sub_img)
 
     pred_img_list = []
 
     with torch.no_grad():
         for test_img in tqdm(sub_img_list):
-            test_img = test_img[:, np.newaxis, :,:]
-            test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
-                                                                                   dtype=torch.float32)
-
-            net = ConvLSTM(input_dim=input_channel,
-                          hidden_dim=[64, 1], # args.n_features],
-                          kernel_size=(3, 3), num_layers= 2 , # num_layers= args.n_layer,
-                          batch_first=True, bias=bias_status, return_all_layers=False)
-
+            
+            if config["model"] == 'BiLSTM':
+                  net = MV_LSTM(n_features = input_channel,
+                                seq_length = seq_length,
+                                hidden_dim = config['l1'],
+                                num_layers = 1,
+                                batch_first = True,
+                                bidirectional = True)
+            
             net.to(device)
             net.load_state_dict(torch.load(dir_checkpoint))
-          
-            output_list = net(test_img) # all factors but lc
-
-            pred_img = output_list[0].squeeze() # t, c, w, h
-            pred_img = pred_img[-1,:,:] # take last year prediction
-            pred_img_list.append(pred_img.cpu().numpy())
+            
+            
+            if conv == False: # LSTM and GRU
+                #test_img = test_img.squeeze()
+                test_img = test_img.reshape(test_img.shape[0], test_img.shape[1], test_img.shape[-2]*test_img.shape[-1]) # (t,c, w*h)
+                test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
+                test_img = torch.moveaxis(test_img, 2, 0) # (w*h, t, c)
+                net.init_hidden(test_img.shape[0])
+                pred_img = net(test_img) 
+                pred_img = pred_img[:, 0] # take last year prediction
+                pred_img_list.append(pred_img.cpu().numpy().reshape(256, 256))
+            
+            
+            else:
+                test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
+                                                                                       dtype=torch.float32)
+                output_list = net(test_img) 
+                pred_img = output_list[0].squeeze()
+                pred_img = pred_img[-1,:,:] # take last year prediction
+                pred_img_list.append(pred_img.cpu().numpy())
             
            
 
@@ -161,28 +188,30 @@ if __name__ == '__main__':
             pred_msk[x - 128:x + 128, y - 128:y + 128] = pred_img_list[h]
             h += 1
         else:
-            pred_msk[x - 120:x + 120, y - 120:y + 120] = pred_img_list[h][8:248,8:248]
+            pred_msk[x - 106:x + 106, y - 106:y + 106] = pred_img_list[h][22:234,22:234]
             h += 1
 
     plt.imshow(pred_msk)
 
     # rescale to actual pop values
-    ori_unnormed = np.load(proj_dir + 'data/ori_data/pop_pred/input_all_' + str(n_years) + 'y_' + str(n_classes) + 'c_no_na_oh.npy')
+    ori_unnormed = np.load(proj_dir + 'data/ori_data/input_all_unnormed.npy')
     pop_unnormed = ori_unnormed[:, 1, :, :]
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaler.fit(pop_unnormed.reshape(-1, 1))
     pop = scaler.inverse_transform(pred_msk.reshape(-1,1)).reshape(pred_msk.shape[-2], pred_msk.shape[-1])
-    
 
-    save_path = proj_dir + "data/test/{}/lr{}_bs{}_1l{}_2l{}/".format(config["model_n"], config["lr"], config["batch_size"], config["l1"], config["l2"])
 
+    save_path = proj_dir + "data/test/" + save_name + 'frc' + str(config['forecast']) + '/' 
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
     np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
+    #cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
     plt.savefig(save_path + 'pred_msk_eval.png')
     
+    
+    tifffile.imwrite(save_path + 'pred_msk_normed.tif', pred_msk)
+    tifffile.imwrite(save_path + 'pred_msk_rescaled.tif', pop)
+    
 
-import tifffile
-tifffile.imwrite(save_path + 'pred_msk_normed.tif', pred_msk)
-tifffile.imwrite(save_path + 'pred_msk_rescaled.tif', pop)
+main()
 

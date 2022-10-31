@@ -13,11 +13,15 @@ Created on Wed Sep 28 14:59:45 2022
 import geopandas as gpd
 import pandas as pd
 import rasterio
+from rasterio.plot import show
 import rasterstats
 import matplotlib.pyplot as plt
+import xarray as xr
+import os
+from glob import glob
 import numpy as np
 import rioxarray as rxr
-
+from functools import reduce
 
 
 proj_dir = "D:/Masterarbeit/population_prediction/"
