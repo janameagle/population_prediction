@@ -8,13 +8,13 @@ proj_dir = 'D:/Masterarbeit/population_prediction/'
 
 import rasterio
 import matplotlib.pyplot as plt
-from rasterio.plot import show
-from osgeo import gdal, gdalconst
-from skimage import io
-import matplotlib.pyplot as plt
+# from rasterio.plot import show
+# from osgeo import gdal, gdalconst
+# from skimage import io
+# import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import seaborn as sns
+# import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 
 

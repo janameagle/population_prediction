@@ -235,7 +235,7 @@ def main(*kwargs):
 all_models = ['BiLSTM'] #, 'BiConvLSTM' ] 
 all_factors = ['pop'] #, 'static', 'all']
 all_modeln = ['01-20_1y'] 
-runs = ['run1', 'run2', 'run3'] #, 'run4', 'run5']
+runs = ['run3', 'run4', 'run5']
 
 
 for m in all_models:

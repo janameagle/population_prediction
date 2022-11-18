@@ -17,7 +17,7 @@ import rasterstats
 import matplotlib.pyplot as plt
 import numpy as np
 import rioxarray as rxr
-
+from functools import reduce
 
 
 proj_dir = "D:/Masterarbeit/population_prediction/"
@@ -29,7 +29,7 @@ config = {
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
         "batch_size": 6, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
-        "model_n" : '02-20_3y',
+        "model_n" : '04-20_4y',
         "save" : True,
         "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
         "factors" : 'pop', # 'all', 'static', 'pop'
@@ -383,7 +383,8 @@ def change_one_dist(years = ['02', '05', '08', '11', '14', '17'], include_pred =
 ###############################################################################
 # yearly change for one district
 ###############################################################################
-out = change_zonal(pred_arr)
+out = change_zonal(pred_arr, years = ['02', '05', '08', '11', '14', '17', '20'], include_pred = False)
+out4y = change_zonal(pred_arr, years = ['04', '08', '12', '16'], include_pred = True)
 change_pred_gt()
 change_one_dist()
 mean_change_one_dist(dist='Lima')

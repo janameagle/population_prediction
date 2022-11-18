@@ -18,7 +18,11 @@ from sklearn import metrics
 # from skimage.metrics import structural_similarity
 import pandas as pd
 import scipy
+import seaborn as sns
+from scipy import stats
 
+# change matplotlib fontsize globally
+plt.rcParams['font.size'] = 20
 
 # define config
 config = {
@@ -105,7 +109,7 @@ def main(*kwargs):
     # do the plotting
     ###############################################################################
     
-    spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
+    # spatial_plot(poplast, pop20, difflastpred, diff20pred, pred)
     
     # use mask for lima metropolitan area
     # scatter_plot(pop20[lima==1], pred[lima==1])
@@ -260,7 +264,7 @@ def scatter_plot(pop20, pred):
 
 from scipy.interpolate import interpn
 
-def density_scatter( pop20 , pred, sort = True, bins = 100, **kwargs )   :
+def density_scatter( pop20 , pred, name, sort = True, bins = 100, **kwargs )   :
     """
     Scatter plot colored by 2d histogram
     """
@@ -273,7 +277,7 @@ def density_scatter( pop20 , pred, sort = True, bins = 100, **kwargs )   :
     x = pop20[pred>0]  # .reshape(pop20.shape[0]*pop20.shape[1]) # [pop20>0]
     
     
-    fig , ax = plt.subplots(figsize = (10,7))
+    fig , ax = plt.subplots(figsize = (8,8))
     data , x_e, y_e = np.histogram2d(x, y, bins = bins, density = True )
     q = interpn( ( 0.5*(x_e[1:] + x_e[:-1]) , 0.5*(y_e[1:]+y_e[:-1]) ) , data , np.vstack([x,y]).T , method = "splinef2d", bounds_error = False)
 
@@ -301,29 +305,36 @@ def density_scatter( pop20 , pred, sort = True, bins = 100, **kwargs )   :
     ax.xaxis.grid(False)
     
     # labels
-    ax.set_title('Scatterplot prediction and ground truth')
-    ax.set_ylabel('Prediction of 2020')
-    ax.set_xlabel('Ground truth of 2020')
-    fig.colorbar(plot, ax = ax).set_label('Point density in %')
+    ax.set_title(None) #'Predicted and ground truth values')
+    ax.set_ylabel(None) #'Prediction of 2020')
+    ax.set_xlabel(None) #'Ground truth of 2020')
+    # fig.colorbar(plot, ax = ax).set_label('Point density in %')
+    
+    # limit axes
+    ax.set_xlim(-5,350)
+    ax.set_ylim(-5,370)
+    
+    # # add text
+    # if reg == True:
+    #     fig.text(0.5, 0.095, 'Model: ' + config['model_n'])
+    # else:
+    #     fig.text(0.7, 0.095, 'Model: {}_{}_{}, lr {}, bs: {}, l1: {}, ep: {}'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["epochs"]),
+    #              verticalalignment='bottom', horizontalalignment = 'right', 
+    #              fontsize = 10)
     
     
-    # add text
-    if reg == True:
-        fig.text(0.5, 0.095, 'Model: ' + config['model_n'])
-    else:
-        fig.text(0.7, 0.095, 'Model: {}_{}_{}, lr {}, bs: {}, l1: {}, ep: {}'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["epochs"]),
-                 verticalalignment='bottom', horizontalalignment = 'right', 
-                 fontsize = 10)
+    fig.text(0.5, 0.15, 'Model: ' + name, fontsize = 20)
     
     mae, rmse, r2, r, pears_r, medae = error_measures(pred, pop20)
-    fig.text(0.1, 0.72, ' R: {} \n R²: {} \n RMSE: {} \n MAE: {} \n MedAE: {}'.format(r, r2, rmse, mae, medae), fontsize = 15)
+    fig.text(0.12, 0.72, ' MAE: {} \n MedAE: {} \n RMSE: {} \n R²: {}'.format(mae, medae, rmse, r2), fontsize = 20)
 
     
     fig.tight_layout()
 
     # save to file
     if config["save"] == True:
-        plt.savefig(save_path + 'scatter_density_check_LMA.png')
+        # plt.savefig(save_path + 'scatter_density_check_LMA.png')
+        plt.savefig(path + 'figures/' + name + '_scatter_density.png')
     
         
 
@@ -355,24 +366,135 @@ def error_measures(pop20, pred):
     
     # save in df
     errors_df = pd.DataFrame(errors)
-    errors_df.to_csv(save_path + 'error_measures_LMA.csv')
+    # errors_df.to_csv(save_path + 'error_measures_LMA.csv')
         
     return mae, rmse, r2, r, pears_r, medae
 
 
 
-# run for all models    
-all_models = ['BiLSTM'] #, 'BiConvLSTM' ] 
-all_factors = ['pop'] #, 'static', 'all']
-all_modeln = ['01-20_1y'] #, '04-20_4y'] 
-runs = ['run1', 'run2'] #, 'run3', 'run4', 'run5']
+# # run for all models    
+# all_models = ['ConvLSTM', 'BiConvLSTM', 'LSTM', 'BiLSTM', 'multivariate_linear_reg', 'random_forest_reg'] #, 'BiConvLSTM' ] 
+# all_factors = ['all', 'static', 'pop']
+# all_modeln = ['02-20_3y'] #, '04-20_4y'] 
+# runs = ['run3', 'run4', 'run5']
 
 
-for m in all_models:
-    for n in all_modeln:
-        for r in runs:
-            config['model'] = m
-            config['model_n'] = n
-            config['run'] = r
-            main(config)
+# for m in all_models:
+#     for n in all_modeln:
+#         for r in runs:
+#             config['model'] = m
+#             config['model_n'] = n
+#             config['run'] = r
+#             main(config)
+
+
+###############################################################################
+# all scatter plots together
+###############################################################################
+
+# global reg    
+# reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False
+
+
+path = proj_dir + 'data/test/'
+gt = np.load(proj_dir + 'data/ori_data/input_all_unnormed.npy')
+lima = np.load(proj_dir + 'data/ori_data/lima_ma.npy')
+pop = gt[:,1,:,:] # all years   
+pop20 = pop[-1,:,:]
+pop20[lima == 0] = np.nan
+    
+params6 = 'lr0.0012_bs6_1l64_2lna/'
+params2 = 'lr0.0012_bs2_1l64_2lna/'
+paramsLSTM = 'lr0.0012_bs1_1l64_2lna/'
+
+models = ['ConvLSTM_02-20_3y_all/' + params2 + 'run3/', 
+            'ConvLSTM_02-20_3y_static/' + params2 + 'run5/',
+            'ConvLSTM_02-20_3y_pop/' + params2 + 'run4/',
+            'BiConvLSTM_02-20_3y_all/' + params6 + 'run2/', # bs6
+            'BiConvLSTM_02-20_3y_static/' + params2 + 'run2/',    
+            'BiConvLSTM_02-20_3y_pop/' + params2 + 'run2/',  
+            'LSTM_02-20_3y_all/' + paramsLSTM + 'run3/',
+            'LSTM_02-20_3y_static/' + paramsLSTM + 'run1/',
+            'LSTM_02-20_3y_pop/' + paramsLSTM + 'run4/',
+            'BiLSTM_02-20_3y_all/' + paramsLSTM + 'run5/',                       
+            'BiLSTM_02-20_3y_static/' + paramsLSTM + 'run3/', 
+            'BiLSTM_02-20_3y_pop/' + paramsLSTM + 'run2/',  
+            'multivariate_reg_02-20_3y_all/',
+            'multivariate_reg_02-20_3y_static/',
+            'random_forest_reg_02-20_3y_all/',
+            'random_forest_reg_02-20_3y_static/',
+            'random_forest_reg_02-20_3y_pop/',
+            'linear_reg_02-20_3y_pop/'
+           ]
+
+# all_models = pd.DataFrame(columns=['gt', 'model_n', 'feature'])
+
+# i = 1
+# t = len(models)
+top = cm.get_cmap('Reds_r', 128)
+bottom = cm.get_cmap('Greens', 128)
+newcolors = np.vstack((top(np.linspace(0, 1, 128)),
+                       bottom(np.linspace(0, 1, 128))))
+diffcmap = ListedColormap(newcolors, name='RdGn')
+import matplotlib.ticker as ticker
+
+for model in models:
+    pred = np.load(path + model + 'pred_msk_eval_rescaled.npy')
+    # mask lima region -> island will be removed
+    # set negative predicted values to 0
+    # pred[lima == 0] = np.nan # 0
+    pred[pred < 0] = 0
+    
+    data = pd.DataFrame(columns=['gt', 'model_n', 'feature'])
+    data['gt'] = pop20[lima==1]
+    data['pred'] = pred[lima==1]
+    
+    model_n = model.split('/')[0]
+    n_short = model_n.split('_')[0]
+    if n_short == 'random':
+        n_short = 'RF'
+    elif n_short == 'multivariate':
+        n_short = 'linear'
+    
+    name = n_short  + '_' + model_n.split('_')[-1]
+    # data['model_n'] = n_short
+    # data['feature'] = feature
+    
+    # values = np.vstack([data['pred'], data['gt']])
+    # data['kernel'] 
+    # ker = stats.gaussian_kde(values)(values)
+    
+    # all_models = pd.concat([all_models, data], ignore_index=True)
+    
+    # plt.subplot(t,t,i)
+    # density_scatter(pop20[lima==1], pred[lima==1], name = name)
+
+    diff20pred = pred - pop20    
+    fig, ax = plt.subplots(figsize = (8,8))
+    plt.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -30, vmax = 30)
+    plt.title(None)
+    ax.xaxis.set_major_locator(ticker.NullLocator())
+    ax.yaxis.set_major_locator(ticker.NullLocator())
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    fig.text(0.2, 0.2, 'Model: ' + name, fontsize = 15)
+    plt.show()
+    fig.savefig(path + 'figures/' + name + '_pred_diff.png')
+
+    # i += 1
+
+# print(all_models)
+
+
+
+
+# tips = sns.load_dataset("tips")
+   
+# g = sns.FacetGrid(all_models, row='feature', col='model_n', margin_titles=True)
+# g.map_dataframe(sns.scatterplot, 'gt', 'pred', color='kernel', cmap='viridis', fit_reg=False, x_jitter=.1)
+# for ax in g.axes_dict.values():
+#     ax.axline((0, 0), slope=1, c='red', zorder=0)
+
 
