@@ -1,19 +1,24 @@
+
+"""
+In this script, the trained models are used to make predictions.
+It is used to predict 2020 for validation.
+"""
+
+
 import numpy as np
 import os
 import torch
 from tqdm import tqdm
 from torch.autograd import Variable
-import pandas as pd
 from model.v_convlstm import ConvLSTM
 from model.bi_convlstm import ConvBLSTM
-from model.v_convgru import ConvGRU
+# from model.v_convgru import ConvGRU
 from model.v_lstm import MV_LSTM
-from model.v_gru import GRU
+# from model.v_gru import GRU
 from sklearn.preprocessing import MinMaxScaler
 from sklearn import metrics
 import matplotlib.pyplot as plt
 import tifffile
-
 
 
 proj_dir = "D:/Masterarbeit/population_prediction/"
@@ -35,8 +40,7 @@ config = {
 
 def evaluate(gt, pred):
     mae = metrics.mean_absolute_error(gt, pred)
-    rmse = metrics.mean_squared_error(gt, pred, squared = False)
-            
+    rmse = metrics.mean_squared_error(gt, pred, squared = False)    
     return mae, rmse
 
 
@@ -68,8 +72,8 @@ def main(*kwargs):
     save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])        
 
 
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cpu'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = 'cpu'
     
     ori_data_dir = proj_dir + 'data/ori_data/input_all.npy'
     ori_data = np.load(ori_data_dir)# .transpose((1, 0, 2, 3))
@@ -107,9 +111,11 @@ def main(*kwargs):
     input_channel = 10 if config['factors'] == 'all' else 5 if config['factors'] == 'static' else 1
             
     
-                
+    # load checkpoint of last epoch from training            
     dir_checkpoint = proj_dir + 'data/ckpts/' + save_name + 'CP_epoch{}.pth'.format(config["epochs"]-1)        
     
+    
+    # slice the image for prediction - stitch together afterwards
     x_list, y_list = get_subsample_centroids(valid_input, img_size=256)
     
     sub_img_list = []
@@ -124,11 +130,7 @@ def main(*kwargs):
     
     with torch.no_grad():
         for test_img in tqdm(sub_img_list):
-    
-            #plt.imshow(test_img[0,0,:,:])
-            #plt.show()        
-            
-               
+  
             if config["model"] == 'ConvLSTM':       
                 net = ConvLSTM(input_dim = input_channel,
                                hidden_dim= 64, #[config['l1'], 1], 
@@ -169,17 +171,16 @@ def main(*kwargs):
             
             
             if conv == False: # LSTM and GRU
-                #test_img = test_img.squeeze()
                 test_img = test_img.reshape(test_img.shape[0], test_img.shape[1], test_img.shape[-2]*test_img.shape[-1]) # (t,c, w*h)
-                test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
                 test_img = torch.moveaxis(test_img, 2, 0) # (w*h, t, c)
-                net.init_hidden(test_img.shape[0])
+                test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
+                # net.init_hidden(test_img.shape[0])
                 pred_img = net(test_img) 
                 pred_img = pred_img[:, 0] # take last year prediction
                 pred_img_list.append(pred_img.cpu().numpy().reshape(256, 256))
             
             
-            else:
+            else: # convLSTM
                 test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                        dtype=torch.float32)
                 output_list = net(test_img) 
@@ -222,7 +223,6 @@ def main(*kwargs):
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
     np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
-    #cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
     plt.savefig(save_path + 'pred_msk_eval.png')
     
     
@@ -232,10 +232,10 @@ def main(*kwargs):
 
 
 # run for all models    
-all_models = ['BiLSTM'] #, 'BiConvLSTM' ] 
-all_factors = ['pop'] #, 'static', 'all']
-all_modeln = ['01-20_1y'] 
-runs = ['run3', 'run4', 'run5']
+all_models = ['BiLSTM']     # ['LSTM', 'BiLSTM', 'ConvLSTM' 'BiConvLSTM' ] 
+all_factors = ['pop']       # ['pop', 'static', 'all']
+all_modeln = ['01-20_1y']   # ['01-20_1y', '02-20_2y', '02-20_3y', '04-20_4y']
+runs = ['run3', 'run4', 'run5'] # ['run1', 'run2', 'run3', 'run4', 'run5']
 
 
 for m in all_models:

@@ -4,32 +4,32 @@ Created on Mon May 30 13:39:02 2022
 
 @author: jmaie
 """
-# data_dir = "H:/Masterarbeit/Code/population_prediction/"
+
+"""
+In this script, the predicted 2020 pop distribution is validated with the WorldPop 2020 grid.
+"""
+
 proj_dir = "D:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
 import numpy as np
-# from skimage import io
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.colors import ListedColormap
 from sklearn import metrics
-# from skimage.metrics import structural_similarity
 import pandas as pd
 import scipy
-import seaborn as sns
-from scipy import stats
+
 
 # change matplotlib fontsize globally
 plt.rcParams['font.size'] = 20
 
 # define config
 config = {
-        "l1": 64, #64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
-        "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
-        "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
-        "batch_size": 2, #random.choice([2, 4, 6, 8]),
+        "l1": 64, 
+        "l2": 'na', 
+        "lr": 0.0012, 
+        "batch_size": 2, 
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save" : True,
@@ -69,7 +69,7 @@ def main(*kwargs):
     gt = np.load(gt_path)
     
     
-    # mask lima region -> island will be removed
+    # mask lima metropolitan area -> island will be removed
     # set negative predicted values to 0
     lima = np.load(proj_dir + 'data/ori_data/lima_ma.npy') # lima_ma is new lima regions
     pred[lima == 0] = np.nan # 0
@@ -91,11 +91,7 @@ def main(*kwargs):
     # np.save(save_path + 'diff20pred.npy', diff20pred)
     
     # define colormaps
-    #cmap = 'seismic' # cm.bwr
-    #discrete = cm.tab20c
-    #popcmap = LinearSegmentedColormap.from_list("", ["#fbf4f3", '#fbecc0', "#f9de95", "#f4b43f", "#c64912", "#340f08", "#010000"]) # cm.OrRd
-    popcmap = 'inferno'
-    
+    # popcmap = 'inferno'
     # colors from red to green
     global reds
     reds = cm.get_cmap('Reds', 128)
@@ -105,6 +101,7 @@ def main(*kwargs):
                            bottom(np.linspace(0, 1, 128))))
     global diffcmap
     diffcmap = ListedColormap(newcolors, name='RdGn')
+
 
 
 
@@ -121,7 +118,7 @@ def main(*kwargs):
 
 
 
-
+# define the plot functions
 ###############################################################################
 # spatial plot gt, pred, pred difference
 ###############################################################################
@@ -171,32 +168,32 @@ def spatial_plot(poplast, pop20, difflastpred, diff20pred, pred):
     #     plt.savefig(save_path + 'spatial_pred_check_LMA.png')
     
     
-        # save subplots
-        difflast = plt.figure(figsize = (20,16))
-        plt.imshow(difflastpred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
-        plt.title("Model: {}_{}_{} | Diff pred - 20{}".format(config["model"], config["model_n"], config["factors"], str(lastyear)))
-        plt.colorbar(location = 'right')
-        difflast.savefig(save_path + 'spatial_pred_check_20{}_LMA.png'.format(lastyear))
-        
-        
-        diff20 = plt.figure(figsize = (20,16))
-        plt.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
-        plt.title("Model: {}_{}_{} | Diff pred - 2020".format(config["model"], config["model_n"], config["factors"]))
-        plt.colorbar(location = 'right')
-        diff20.savefig(save_path + 'spatial_pred_check_2020_LMA.png')
-    
-        diffrate20 = plt.figure(figsize = (20,16))
-        plt.imshow(diffrate20pred[:, 100:], cmap = reds, vmin = 0, vmax = 1)
-        plt.title("Model: {}_{}_{} | Diff rate pred - 2020".format(config["model"], config["model_n"], config["factors"]))
-        plt.colorbar(location = 'right')
-        diff20.savefig(save_path + 'spatial_pred_check_2020_rate_LMA.png')
+    # save subplots
+    difflast = plt.figure(figsize = (20,16))
+    plt.imshow(difflastpred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
+    plt.title("Model: {}_{}_{} | Diff pred - 20{}".format(config["model"], config["model_n"], config["factors"], str(lastyear)))
+    plt.colorbar(location = 'right')
+    difflast.savefig(save_path + 'spatial_pred_check_20{}_LMA.png'.format(lastyear))
     
     
-        # pred20 = plt.figure(figsize = (20,16))
-        # plt.imshow(pred[:, 100:], cmap = popcmap, vmin = 0, vmax = 300) # change to percentile? similar to qgis?
-        # plt.title("Prediction of 2020")
-        # plt.colorbar(location = 'right')
-        # pred20.savefig(save_path + 'prediction_2020.png')
+    diff20 = plt.figure(figsize = (20,16))
+    plt.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -40, vmax = 40)
+    plt.title("Model: {}_{}_{} | Diff pred - 2020".format(config["model"], config["model_n"], config["factors"]))
+    plt.colorbar(location = 'right')
+    diff20.savefig(save_path + 'spatial_pred_check_2020_LMA.png')
+
+    diffrate20 = plt.figure(figsize = (20,16))
+    plt.imshow(diffrate20pred[:, 100:], cmap = reds, vmin = 0, vmax = 1)
+    plt.title("Model: {}_{}_{} | Diff rate pred - 2020".format(config["model"], config["model_n"], config["factors"]))
+    plt.colorbar(location = 'right')
+    diff20.savefig(save_path + 'spatial_pred_check_2020_rate_LMA.png')
+
+
+    # pred20 = plt.figure(figsize = (20,16))
+    # plt.imshow(pred[:, 100:], cmap = popcmap, vmin = 0, vmax = 300) # change to percentile? similar to qgis?
+    # plt.title("Prediction of 2020")
+    # plt.colorbar(location = 'right')
+    # pred20.savefig(save_path + 'prediction_2020.png')
 
 
 
@@ -211,7 +208,7 @@ def scatter_plot(pop20, pred):
     p = np.poly1d(z)
     
 
-####### crop image
+    # crop image
     # pred = pred[:, 700:] #190:700]
     # pop20 = pop20[:, 700:] #190:700]
    
@@ -392,18 +389,20 @@ def error_measures(pop20, pred):
 
 # run for all models    
 all_models = ['linear_reg', 'random_forest_reg','ConvLSTM', 'BiConvLSTM', 'LSTM', 'BiLSTM'] #, 'multivariate_linear_reg', 'random_forest_reg'] #, 'BiConvLSTM' ] 
-all_factors = ['pop'] #, 'static', 'pop']
-all_modeln = ['02-20_3y'] #, '04-20_4y'] 
+all_factors = ['pop'] # ['all', 'static', 'pop']
+all_modeln = ['02-20_3y'] #['04-20_4y', '02-20-_3y', '02-20_2y', '01-20_y1'] 
 runs = ['run1', 'run2', 'run3', 'run4', 'run5']
 
 
-# for m in all_models:
-#     for f in all_factors:
-#         for r in runs:
-#             config['model'] = m
-#             config['factors'] = f
-#             config['run'] = r
-#             main(config)
+for m in all_models:
+    for f in all_factors:
+        for r in runs:
+            config['model'] = m
+            config['factors'] = f
+            config['run'] = r
+            main(config)
+
+
 
 
 ###############################################################################
@@ -412,7 +411,6 @@ runs = ['run1', 'run2', 'run3', 'run4', 'run5']
 
 # global reg    
 # reg = True if config['model'] in ['linear_reg', 'multivariate_reg', 'random_forest_reg'] else False
-
 
 path = proj_dir + 'data/test/'
 gt = np.load(proj_dir + 'data/ori_data/input_all_unnormed.npy')
@@ -504,15 +502,5 @@ for model in models:
     # i += 1
 
 # print(all_models)
-
-
-
-
-# tips = sns.load_dataset("tips")
-   
-# g = sns.FacetGrid(all_models, row='feature', col='model_n', margin_titles=True)
-# g.map_dataframe(sns.scatterplot, 'gt', 'pred', color='kernel', cmap='viridis', fit_reg=False, x_jitter=.1)
-# for ax in g.axes_dict.values():
-#     ax.axline((0, 0), slope=1, c='red', zorder=0)
 
 

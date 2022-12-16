@@ -1,6 +1,7 @@
 
-# this script is for reading, resampling and stacking the data, 
-# data will be used in the ViT model
+# this script is for reading, resampling and stacking the data 
+# data will be used in the deep learning models
+
 
 library(raster)
 path <- "C:/Users/jmaie/Documents/Masterarbeit/"

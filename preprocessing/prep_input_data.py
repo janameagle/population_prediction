@@ -5,8 +5,13 @@ Created on Tue Sep 13 08:29:51 2022
 @author: maie_ja
 """
 
-# This script is for preparation and preprocessing of the input data
-# The input features for all years will be stacked and masked to lima region
+"""
+This script is for preparation and preprocessing of the input data.
+The input features for all years will be stacked and masked to lima region.
+Output are raster stack for each year containing all input features.
+"""
+
+
 
 import numpy as np
 from skimage import io

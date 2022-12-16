@@ -5,6 +5,12 @@ Created on Thu Jun 23 12:42:32 2022
 @author: jmaie
 """
 
+"""
+In this script, the simple linear regression, multivariate linear regression 
+and random forest regression are trained to be used as baseline models.
+Their results will be compared to the neural network results.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -12,16 +18,13 @@ from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LinearRegression
 from sklearn import metrics
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-
+import tifffile
 
 
 proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
-
-# define hyperparameters
+# define parameters
 config = {
         "model_n" : '02-17_3y',
         "save_cp" : True,
@@ -39,6 +42,10 @@ pop20 = ori_data[-1,1,:,:]
 
 ###############################################################################
 
+
+################ simple linear regression
+
+# pixel wise linear regression with population as single input
 def linear_reg(ori_data):
     p = ori_data[:,1,:,:].reshape(ori_data.shape[0],-1).transpose(1,0) # (t,c,w,h) -> (w*h, t), population only
 
@@ -92,7 +99,7 @@ def multivariate_reg(ori_data):
         x = np.zeros((p.shape[0], channels + years)) # nr of pixels, nr of features + input years
         x[:,:years] = p[:,:years,0] # per pixel pop values of 3y intervall years
         x[:,years:years + channels] = p[:,0,1:] # per pixel static features (same every year, so middle shape can be exchanged) 
-        feature_names = ['02','05','08','11','14', 'slope', 'roads', 'water', 'center']
+        feature_names = ['02','05','08','11','14', 'slope', 'roads', 'water', 'center'] # for plotting
         y = p[:,-2,0] # per pixel second last year value as train gt
 
     # x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.3, random_state = 100)
@@ -166,21 +173,25 @@ def random_forest_reg(ori_data):
        # x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.3, random_state = 100)
     
     
-    # Initializing the Random Forest Regression model with 10 decision trees
+    # Initializing the Random Forest Regression model with 250 trees
     reg = RandomForestRegressor(n_estimators = 250, random_state = 0, verbose = 1)
 
-    # Fitting the Random Forest Regression model to the data[]
+    # Fitting the Random Forest Regression model to the data
     # reg.fit(x_train, y_train)
     reg.fit(x, y)
     
+    
+    # check feature importances
     print(reg.feature_importances_)
     plt.barh(feature_names, reg.feature_importances_)
     plt.show()    
+    
     
     #Prediction of test set
     # y_pred_mlr= reg.predict(x_test)
     # rmse = metrics.mean_squared_error(y_test, y_pred_mlr)
     # print(rmse)
+    
     
     # predict 2020
     if config["factors"] == 'all':
@@ -205,20 +216,22 @@ def random_forest_reg(ori_data):
     
     return pred_img_1D, reg
 
-#################
+
+
+###############################################################################
   
 # indices for input years depending on interval
 input_years = list(reversed(range(20, 1, -interval))) # list of years with interval
 input_years = [value -1 for value in input_years] # according index to refer to the year
 
 # select relevant input factors
-input_data = ori_data[:,:-4,:,:] if config["factors"] == 'all' else ori_data[:,[1,3,4,5,6],:,:] # if all, no oh lc layers
+input_data = ori_data[:,:-4,:,:] if config["factors"] == 'all' else ori_data[:,[1,3,4,5,6],:,:] # if all, no oh-lc layers
 # select relevant input years
 input_data = input_data[input_years,:,:,:]
 
 
 if config["model"] == 'linear_reg':
-    pred = linear_reg(input_data) # all of the data
+    pred = linear_reg(input_data)
 elif config["model"] == 'multivariate_reg':
     pred, model = multivariate_reg(input_data)
 elif config["model"] == 'random_forest_reg':
@@ -252,87 +265,14 @@ scaler.fit(pop_unnormed.reshape(-1, 1))
 pred_img_rescaled = scaler.inverse_transform(pred_img.reshape(-1,1)).reshape(pred_img.shape[-2], pred_img.shape[-1])
 
 
-
+# save prediction
 save_path = proj_dir + "data/test/{}_{}_{}/".format(config['model'], config['model_n'], config['factors'])
 os.makedirs(save_path, exist_ok=True)
 np.save(save_path + 'pred_msk_eval_normed.npy', pred_img)
 np.save(save_path + 'pred_msk_eval_rescaled.npy', pred_img_rescaled)
 
 
-import tifffile
 tifffile.imwrite(save_path + 'pred_msk_normed.tif', pred_img)
 tifffile.imwrite(save_path + 'pred_msk_rescaled.tif', pred_img_rescaled)
 
 
-
-
-
-###############################################################################
-
-# def twod_reg(ori_data):
-#     pop = ori_data[:,1,:,:] # all years
-#     pop = pop.reshape(pop.shape[0],-1)
-#     p = pop.transpose(1,0)
-    
-#     pred_img_1D = np.zeros((p.shape[0]))
-    
-#     # loop through pixels
-#     for i in tqdm(range(0, p.shape[0])):
-#         one = p[i,:16]
-#         y = one #.reshape(-1,1)
-#         X = np.arange(16).reshape(-1,1)
-#         #X = one[:,1:]
-#         #Xnew = np.append(X, Xyears, axis = 1)
-#         # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
-        
-
-#         ###### polynomial regression
-#         poly = PolynomialFeatures(degree=2, include_bias = False)
-#         X_poly = poly.fit_transform(X) # x.reshape(-1,1)
-#         # poly.fit(X_poly, y)
-#         poly_reg = LinearRegression()
-#         poly_reg.fit(X_poly, y)
-                
-#         interc = poly_reg.intercept_
-#         coef = poly_reg.coef_
-        
-#         # make predictions:
-#         def calc2d(coef, intercept, year):
-#             return coef[0]*year + coef[1]*year**2 + intercept
-        
-#         score = calc2d(coef, interc, 20)
-#         pred_img_1D[i] = score # save prediction for 2020
-        
-#         return pred_img_1D
-    
-    
-# def exp_reg(ori_data):
-#     pop = ori_data[:,1,:,:] # all years
-#     pop = pop.reshape(pop.shape[0],-1)
-#     p = pop.transpose(1,0)
-    
-#     pred_img_1D = np.zeros((p.shape[0]))
-    
-#     # loop through pixels
-#     for i in tqdm(range(0, p.shape[0])):
-#         one = p[i,:16]
-#         y = one #.reshape(-1,1)
-#         X = np.arange(16).reshape(-1,1)
-#         #X = one[:,1:]
-#         #Xnew = np.append(X, Xyears, axis = 1)
-#         # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
-        
-
-#         X = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
-#         np.seterr(divide = 'ignore') 
-#         a, b = np.polyfit(X, np.log(y), 1) # 1 is the degree of the polynomial
-#         # y = a*e^{bx} where y = one, x = X
-        
-#         # make predictions:
-#         def calcexp(a, b, year):
-#             return math.exp(a)*math.exp(b*year)
-        
-#         score = calcexp(a, b, 20)
-#         pred_img_1D[i] = score # save prediction for 2020
-        
-#         return pred_img_1D

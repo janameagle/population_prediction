@@ -4,9 +4,13 @@ Created on Mon May 30 13:39:02 2022
 
 @author: jmaie
 """
-# data_dir = "H:/Masterarbeit/Code/population_prediction/"
+
+"""
+explorative analysis of the input data.
+"""
+
+
 proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
 import numpy as np
@@ -17,7 +21,6 @@ from matplotlib import cm
 
 # read predicted data
 pred_path = proj_dir + 'data/test/pop_pred/pop_No_seed_20y_4c_rand_srch_15-20/lr0.00145_bs2/'#.format(pred_seq, model_n,factor_option)
-
 pred = np.load(pred_path + 'pred_msk_eval_rescaled.npy')
 
 

@@ -1,3 +1,10 @@
+
+"""
+In this script, the trained model checkpoints are used to create forecasts of 
+population distribution for multiple years until 2035. 
+They will be used for the hazard exposure assessment.
+"""
+
 import numpy as np
 import os
 import torch
@@ -51,12 +58,9 @@ def main(*kwargs):
     conv = False if config['model'] in ['LSTM' , 'BiLSTM'] else True
     if conv == False: # LSTM and GRU
         config['batch_size'] = 1
-
-        
-        
+    
     save_name = '{}_{}_{}/lr{}_bs{}_1l{}_2l{}/{}/'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])        
 
-    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     ori_data_dir = proj_dir + 'data/ori_data/input_all.npy'
@@ -205,13 +209,12 @@ def main(*kwargs):
     os.makedirs(save_path, exist_ok=True)
     np.save(save_path + 'pred_msk_eval_normed.npy', pred_msk)
     np.save(save_path + 'pred_msk_eval_rescaled.npy', pop)
-    #cv2.imwrite(save_path + 'pred_msk_eval.png', pred_msk)
     plt.savefig(save_path + 'pred_msk_eval.png')
-    
     
     tifffile.imwrite(save_path + 'pred_msk_normed.tif', pred_msk)
     tifffile.imwrite(save_path + 'pred_msk_rescaled.tif', pop)
     
+
 
 main()
 

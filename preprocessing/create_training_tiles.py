@@ -4,9 +4,16 @@ Created on Mon May 30 13:39:02 2022
 
 @author: jmaie
 """
-# data_dir = "H:/Masterarbeit/Code/population_prediction/"
+
+"""
+This file is for preprocessing of the input data. 
+Multiple years of population and additional input data sets are stacked.
+MODIS land cover data is adjusted to just reflect 4 classes as one-hot layer.
+Data is masked to Lima Metropolitan Area.
+Image is split into 169 smaller but overlapping tiles for training of the neural networks.
+"""
+
 proj_dir = "H:/Masterarbeit/population_prediction/"
-# proj_dir = "C:/Users/jmaie/Documents/Masterarbeit/Code/population_prediction/"
 
 
 import numpy as np
@@ -117,8 +124,7 @@ h_total = full_image.shape[-1]
 w_total = full_image.shape[-2]
 img_size = 256 # how big the tiles should be
 
-# h_step = int(h_total // img_size * 1.5)                                    # why *1.5?
-# w_step = int(w_total // img_size * 1.5)
+
 
 x_list = np.linspace(img_size//2, h_total -(img_size//2), num = 10) # Return evenly spaced numbers over a specified interval
 y_list = np.linspace(img_size//2, w_total -(img_size//2), num = 10) # num = w_step, num = 14
@@ -158,11 +164,6 @@ for i in range(len(sub_img_list)):
 #     plt.show()
 
 # targ = np.load(proj_dir + 'data/train/target_less_tiles/10_target.npy')
-
-
-# inp1 = np.load(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/input/20_input.npy')
-# targ1 = np.load(proj_dir + 'data/train/lulc_pred_6y_4c_no_na/target/20_target.npy')
-
 
 
 

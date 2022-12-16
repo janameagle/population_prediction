@@ -4,12 +4,15 @@ Created on Thu Nov 10 13:33:47 2022
 
 @author: maie_ja
 """
+
+"""
+plotting the population change of Lima and Peru over the years.
+"""
+
 proj_dir = "D:/Masterarbeit/population_prediction/"
 
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import matplotlib.ticker as tkr
 
 # colors
