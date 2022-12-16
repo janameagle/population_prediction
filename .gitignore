@@ -5,5 +5,6 @@ data/
 *.RData
 share/
 .spyproject/
-old/
+old_/
 *.qgz
+results/output/

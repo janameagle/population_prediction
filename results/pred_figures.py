@@ -4,11 +4,6 @@ Created on Wed Sep 28 14:59:45 2022
 
 @author: maie_ja
 """
-# raterstats: https://www.youtube.com/watch?v=VIr-pejky6E&ab_channel=GeoDeltaLabs
-# xarray_spatial: https://carpentries-incubator.github.io/geospatial-python/12-zonal-statistics-raster/index.html
-# rasterio: https://deepnote.com/@carlos-mendez/PYTHON-Zonal-statistics-bb1139f4-53a2-4943-982e-9cedca5dee16
-# rasterize vector: https://opensourceoptions.com/blog/zonal-statistics-algorithm-with-python-in-4-steps/
-
 
 import geopandas as gpd
 import rasterio

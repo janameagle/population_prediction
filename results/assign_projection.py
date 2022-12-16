@@ -5,10 +5,11 @@ Created on Wed Sep 28 13:25:22 2022
 @author: maie_ja
 """
 
-# assign the correct projection (as from the input data) 
-# analyze the trends per districts
-# district boundaries from https://data.humdata.org/dataset/cod-ab-per
-
+"""
+assign the correct projection (as from the input data) to the prediction tifs
+analyze the trends per districts
+district boundaries from https://data.humdata.org/dataset/cod-ab-per
+"""
 
 proj_dir = "D:/Masterarbeit/population_prediction/"
 

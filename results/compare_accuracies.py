@@ -4,11 +4,19 @@ Created on Fri Sep  2 10:26:05 2022
 
 @author: maie_ja
 """
+
+"""
+comparison of all models and their error measures
+"""
+
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 from paretoset import paretoset
+import seaborn as sns
+
 
 # change matplotlib fontsize globally
 plt.rcParams['font.size'] = 32
@@ -140,22 +148,11 @@ for model in models:
 
 errors = errors.drop(['pears_r'], axis = 1)
 errors = errors.drop(['r'], axis = 1)
-# errors = errors.drop(['r2'], axis = 1)
-# errors = errors.set_index('model_n')
-# print(errors)
-# print(errors['rmse'])
 
-
-# ax1 = errors.plot.scatter(x='mae',
-#                       y='rmse',
-#                       c='r2',
-#                       colorbar = 'viridis')
-
-
-# plt.plot(errors)
 
 ####################################
 # scatterplot
+####################################
 
 errors.index.name = 'model_n'
 
@@ -168,7 +165,7 @@ errors.index.name = 'model_n'
 # plt.show()
 
 
-import seaborn as sns
+
 
 fig,ax = plt.subplots()
 sns.scatterplot(data=errors, hue='model_n', x='medae', y='rmse', palette= 'Set2', s=200) #'Spectral'
@@ -287,8 +284,12 @@ for model in models:
 
 print(model_mean)
 
+
+
 ####################################
 # barplots
+####################################
+
 err = best_models.drop(['r2', 'feat', 'model_n_short', 'run'], axis = 1)
 errors_m = err.sort_values('rmse', ascending=False)
 errors_m = errors_m.melt(id_vars=['model_n', 'interval'], var_name= 'error', value_name = 'value')
@@ -316,17 +317,6 @@ plt.title('Mean errors per model')
 plt.legend(title = 'Error measure')
 plt.ylabel(None)
 
-
-
-
-# # Shrink current axis's height by 10% on the bottom
-# box = ax.get_position()
-# ax.set_position([box.x0, box.y0 + box.height * 0.1,
-#                  box.width, box.height * 0.9])
-
-# # Put a legend below current axis
-# ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
-#           fancybox=True, shadow=True, ncol=5)
 
 
 rvalues_m = best_models[['model_n', 'interval', 'r2']].sort_values('r2', ascending=True)
