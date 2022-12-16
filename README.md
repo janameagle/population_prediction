@@ -10,7 +10,7 @@ The resulting forecasted future population distributions are used together with 
 
 These are the processing steps and according folders:
 - preprocessing : normalizing, masking, resampling, stacking of input features and creation of training tiles
-- train: train different deep learning models 
+- train: train different deep learning and base models 
           - model: architecture of the neural networks
           - utilis: additional settings for the networks
 - predict: use the trained networks to predict future time steps
