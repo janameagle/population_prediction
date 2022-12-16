@@ -46,6 +46,9 @@ pred_path =  save_path + "pred_msk_eval_rescaled.npy"
 diff_path = save_path + "diff20pred.npy"
 # gt_path = proj_dir + 'data/ori_data/input_all_unnormed.npy'
 
+
+pred_path = 'D:/Masterarbeit/population_prediction/data/0_figures/forecast_tifs/flow_depth_89.npy'
+save_path = 'D:/Masterarbeit/population_prediction/data/0_figures/forecast_tifs/flow_depth_89.tif'
 pred = np.load(pred_path)
 # diff20pred = np.load(diff_path)
 
@@ -63,8 +66,16 @@ y_max = GeoT[3]
 pixel_size = GeoT[1]
 
 
+# newGeoT
+x_pixels = 89
+y_pixels = 89
+pixel_width = (GeoT[1]*888)/x_pixels
+pixel_height = (GeoT[5]*888)/y_pixels
+new_GeoT = (GeoT[0], pixel_width, GeoT[2], GeoT[3], GeoT[4], pixel_height)
+
+
 # assign projection 
-save_name = save_path + 'pred.tif'
+save_name = save_path #+ 'pred.tif'
 # save_name_diff = save_path + 'diff20pred.tif'
 driver = gdal.GetDriverByName('GTiff')
 dataset = driver.Create(
@@ -74,7 +85,7 @@ dataset = driver.Create(
         1,
         gdal.GDT_Float32, )
 
-dataset.SetGeoTransform(GeoT)
+dataset.SetGeoTransform(new_GeoT) # GeoT
 # dataset.SetGeoTransform((
 #         x_min,    # 0
 #         pixel_size,  # 1

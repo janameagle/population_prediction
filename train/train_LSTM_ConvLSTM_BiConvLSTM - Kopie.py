@@ -42,7 +42,7 @@ config = {
         "model_n" : '04-20_4y', # 02-20_2y, 01-20_1y
         "save_cp" : True,
         "save_csv" : True,
-        "model": 'ConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'ConvGRU'
+        "model": 'BiConvLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'ConvGRU'
         "factors" : 'pop', # 'all', 'static', 'pop'
         "run" : 'run1'
     }
@@ -133,8 +133,8 @@ def get_valid_record(valid_input, gt, net, factors, device = device):
                 test_img = np.moveaxis(test_img, 2, 0) # (w*h, t, c)
                 test_img = torch.from_numpy(test_img.copy()).to(device=device, dtype=torch.float32) # (w*h, t, c)
                 pred_img = net(test_img[:, :-1, :]) # all except last year
-                pred_img = pred_img[:, -1, :].squeeze()
-                # pred_img = pred_img[:, 0] # take last year prediction
+                # pred_img = pred_img[:, -1, :]
+                pred_img = pred_img[:, 0] # take last year prediction
                 pred_img_list.append(pred_img.cpu().numpy().reshape(256, 256))
             
             
@@ -142,13 +142,11 @@ def get_valid_record(valid_input, gt, net, factors, device = device):
                 test_img = Variable(torch.from_numpy(test_img.copy())).unsqueeze(0).to(device=device,
                                                                                    dtype=torch.float32)
                 output_list = net(test_img[:, :-1, :, :, :]) # except last year
-                # pred_img = output_list[0].squeeze()
-                # pred_img = pred_img[-1,:,:] # take last year prediction
-                pred_img = output_list[:,:,-1,:].squeeze()
-                # pred_img = output_list.squeeze()
+                pred_img = output_list[0].squeeze()
+                pred_img = pred_img[-1,:,:] # take last year prediction
                 # criterion = nn.MSELoss()
                 # loss = criterion(pred_img.float(), test_img[:,-1,0,:,:].squeeze().float()) # validation loss
-                pred_img_list.append(pred_img.cpu().numpy().reshape(256,256))
+                pred_img_list.append(pred_img.cpu().numpy())
    
     
     pred_msk = np.zeros((valid_input.shape[-2], valid_input.shape[-1]))
@@ -293,7 +291,7 @@ def train_ConvGRU(config):
             
             if conv == False: #config['model'] == 'LSTM':
                 output = net(imgs)
-                output = output[:, -1, :]
+                #output = output[:, -1, :]
                 loss = criterion(output.view(-1), true_masks[:,-1]) 
                 pred_for_acc = output.detach().cpu().numpy()
                 true_masks_for_acc = true_masks[:,-1].detach().cpu().numpy()
@@ -412,7 +410,7 @@ early_stopping = EarlyStopping(tolerance=10, min_delta=0.01)
 
 
 # # run with current set of random hyperparameters
-all_models = ['ConvLSTM']
+all_models = ['BiConvLSTM']
 all_factors = ['pop']
 all_modeln = ['02-20_3y'] 
 runs = ['run6']

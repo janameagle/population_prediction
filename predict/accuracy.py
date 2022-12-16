@@ -34,7 +34,7 @@ config = {
         "model_n" : '02-20_3y',
         "save" : True,
         # "model": 'BiLSTM', # 'ConvLSTM', 'LSTM', 'BiConvLSTM', 'linear_reg', 'multivariate_reg',' 'random_forest_reg'
-        "factors" : 'pop', # 'all', 'static', 'pop'
+        "factors" : 'all', # 'all', 'static', 'pop'
         # "run" : 'run3'
     }
 
@@ -54,11 +54,14 @@ def main(*kwargs):
     lastyear = 20 - interval
     
     global save_path
+    global fig_path
     save_path = proj_dir + 'data/test/{}_{}_{}/'.format(config['model'], config['model_n'], config['factors'])
+    fig_path = proj_dir + 'data/test/figures/{}_{}_{}_'.format(config['model'], config['model_n'], config['factors'])
     
     if reg == False:
         save_path = save_path + 'lr{}_bs{}_1l{}_2l{}/{}/'.format(config["lr"], config["batch_size"], config["l1"], config["l2"], config["run"])
-       
+        fig_path = fig_path + '{}_'.format(config["run"])
+      
     pred_path =  save_path + "pred_msk_eval_rescaled.npy"
     gt_path = proj_dir + 'data/ori_data/input_all_unnormed.npy'
     
@@ -85,7 +88,7 @@ def main(*kwargs):
     diff20pred = pred - pop20
     global diffrate20pred
     diffrate20pred = (pred - pop20)/pop20
-    np.save(save_path + 'diff20pred.npy', diff20pred)
+    # np.save(save_path + 'diff20pred.npy', diff20pred)
     
     # define colormaps
     #cmap = 'seismic' # cm.bwr
@@ -250,7 +253,7 @@ def scatter_plot(pop20, pred):
     fig.text(0.1, 0.72, ' R: {} \n R²: {} \n RMSE: {} \n MAE: {} \n MedAE: {}'.format(r, r2, rmse, mae, medae), fontsize = 15)
     
     fig.tight_layout()
-    
+    plt.imshow()
     # save to file
     if config["save"] == True:
         plt.savefig(save_path + 'scatter_pred_check_LMA.png')
@@ -277,7 +280,7 @@ def density_scatter( pop20 , pred, name, sort = True, bins = 100, **kwargs )   :
     x = pop20[pred>0]  # .reshape(pop20.shape[0]*pop20.shape[1]) # [pop20>0]
     
     
-    fig , ax = plt.subplots(figsize = (8,8))
+    fig , ax = plt.subplots(figsize = (10,10))
     data , x_e, y_e = np.histogram2d(x, y, bins = bins, density = True )
     q = interpn( ( 0.5*(x_e[1:] + x_e[:-1]) , 0.5*(y_e[1:]+y_e[:-1]) ) , data , np.vstack([x,y]).T , method = "splinef2d", bounds_error = False)
 
@@ -289,8 +292,9 @@ def density_scatter( pop20 , pred, name, sort = True, bins = 100, **kwargs )   :
         idx = q.argsort()
         x, y, q = x[idx], y[idx], q[idx]
 
-    plot = ax.scatter( x, y, c=q*100, **kwargs, vmin = 0, vmax = 0.01)
-    plt.plot(pop20, p(pop20), color = 'red', linewidth = 0.2)
+    plot = ax.scatter( x, y, c=q*100, **kwargs, vmin = 0, vmax=0.01)
+    plt.plot(pop20, p(pop20), color = 'red', linewidth = 2)
+    plt.plot(pop20, pop20, color = 'black', linewidth = 2)
 
     # remove box around plot and ticks
     ax.spines['top'].set_visible(False)
@@ -305,36 +309,50 @@ def density_scatter( pop20 , pred, name, sort = True, bins = 100, **kwargs )   :
     ax.xaxis.grid(False)
     
     # labels
-    ax.set_title(None) #'Predicted and ground truth values')
-    ax.set_ylabel(None) #'Prediction of 2020')
-    ax.set_xlabel(None) #'Ground truth of 2020')
+    # ax.set_title('Predicted and WorldPop values 2020')
+    # ax.set_ylabel('Prediction 2020')
+    # ax.set_xlabel('WorldPop 2020')
     # fig.colorbar(plot, ax = ax).set_label('Point density in %')
     
     # limit axes
     ax.set_xlim(-5,350)
     ax.set_ylim(-5,370)
     
-    # # add text
+    
+    # add text        
+    # if config['model'] == 'random_forest_reg':
+    #         n_short = 'RF'
+    # elif config['model'] == 'multivariate_reg':
+    #         n_short = 'linear'
+    # elif config['model'] == 'linear_reg':
+    #         n_short = 'linear'
+    # elif config['model'] == 'BiLSTM':
+    #         n_short = 'LSTM'
+    # fig.text(0.5, 0.15, 'Model: ' + n_short, fontsize = 20)
+    
+    fig.text(0.5, 0.095, 'Model: ' + name)
     # if reg == True:
-    #     fig.text(0.5, 0.095, 'Model: ' + config['model_n'])
+    #     fig.text(0.5, 0.095, 'Model: ' + name)
     # else:
-    #     fig.text(0.7, 0.095, 'Model: {}_{}_{}, lr {}, bs: {}, l1: {}, ep: {}'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["epochs"]),
-    #              verticalalignment='bottom', horizontalalignment = 'right', 
-    #              fontsize = 10)
+    #     # fig.text(0.7, 0.095, 'Model: {}_{}_{}, lr {}, bs: {}, l1: {}, ep: {}'.format(config["model"], config["model_n"], config["factors"], config["lr"], config["batch_size"], config["l1"], config["epochs"]),
+    #     #           verticalalignment='bottom', horizontalalignment = 'right', 
+    #     #           fontsize = 10)
+    #     fig.text(0.7, 0.095, 'Model: ' + name,
+    #               verticalalignment='bottom', horizontalalignment = 'right', fontsize=20)
     
-    
-    fig.text(0.5, 0.15, 'Model: ' + name, fontsize = 20)
+
     
     mae, rmse, r2, r, pears_r, medae = error_measures(pred, pop20)
-    fig.text(0.12, 0.72, ' MAE: {} \n MedAE: {} \n RMSE: {} \n R²: {}'.format(mae, medae, rmse, r2), fontsize = 20)
+    fig.text(0.12, 0.67, ' MAE: {} \n MedAE: {} \n RMSE: {} \n R²: {}'.format(mae, medae, rmse, r2), fontsize = 40)
 
     
     fig.tight_layout()
-
+    
     # save to file
     if config["save"] == True:
-        # plt.savefig(save_path + 'scatter_density_check_LMA.png')
-        plt.savefig(path + 'figures/' + name + '_scatter_density.png')
+        # plt.savefig(save_path + 'scatter_density.png')
+        # plt.savefig(fig_path + 'scatter_density.png')
+        plt.savefig(proj_dir + 'data/test/figures/' + name + '_scatter_density.png')
     
         
 
@@ -372,18 +390,18 @@ def error_measures(pop20, pred):
 
 
 
-# # run for all models    
-# all_models = ['ConvLSTM', 'BiConvLSTM', 'LSTM', 'BiLSTM', 'multivariate_linear_reg', 'random_forest_reg'] #, 'BiConvLSTM' ] 
-# all_factors = ['all', 'static', 'pop']
-# all_modeln = ['02-20_3y'] #, '04-20_4y'] 
-# runs = ['run3', 'run4', 'run5']
+# run for all models    
+all_models = ['linear_reg', 'random_forest_reg','ConvLSTM', 'BiConvLSTM', 'LSTM', 'BiLSTM'] #, 'multivariate_linear_reg', 'random_forest_reg'] #, 'BiConvLSTM' ] 
+all_factors = ['pop'] #, 'static', 'pop']
+all_modeln = ['02-20_3y'] #, '04-20_4y'] 
+runs = ['run1', 'run2', 'run3', 'run4', 'run5']
 
 
 # for m in all_models:
-#     for n in all_modeln:
+#     for f in all_factors:
 #         for r in runs:
 #             config['model'] = m
-#             config['model_n'] = n
+#             config['factors'] = f
 #             config['run'] = r
 #             main(config)
 
@@ -425,7 +443,7 @@ models = ['ConvLSTM_02-20_3y_all/' + params2 + 'run3/',
             'random_forest_reg_02-20_3y_static/',
             'random_forest_reg_02-20_3y_pop/',
             'linear_reg_02-20_3y_pop/'
-           ]
+            ]
 
 # all_models = pd.DataFrame(columns=['gt', 'model_n', 'feature'])
 
@@ -433,8 +451,8 @@ models = ['ConvLSTM_02-20_3y_all/' + params2 + 'run3/',
 # t = len(models)
 top = cm.get_cmap('Reds_r', 128)
 bottom = cm.get_cmap('Greens', 128)
-newcolors = np.vstack((top(np.linspace(0, 1, 128)),
-                       bottom(np.linspace(0, 1, 128))))
+newcolors = np.vstack((top(np.append(np.linspace(0, 0.4, 70), np.linspace(0.4, 1, 30))),
+                        bottom(np.append(np.linspace(0, 0.6, 30), np.linspace(0.6, 1, 70)))))
 diffcmap = ListedColormap(newcolors, name='RdGn')
 import matplotlib.ticker as ticker
 
@@ -467,21 +485,21 @@ for model in models:
     # all_models = pd.concat([all_models, data], ignore_index=True)
     
     # plt.subplot(t,t,i)
-    # density_scatter(pop20[lima==1], pred[lima==1], name = name)
+    density_scatter(pop20[lima==1], pred[lima==1], name = name)
 
-    diff20pred = pred - pop20    
-    fig, ax = plt.subplots(figsize = (8,8))
-    plt.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -30, vmax = 30)
-    plt.title(None)
-    ax.xaxis.set_major_locator(ticker.NullLocator())
-    ax.yaxis.set_major_locator(ticker.NullLocator())
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    fig.text(0.2, 0.2, 'Model: ' + name, fontsize = 15)
-    plt.show()
-    fig.savefig(path + 'figures/' + name + '_pred_diff.png')
+    # diff20pred = pred - pop20    
+    # fig, ax = plt.subplots(figsize = (8,8))
+    # plt.imshow(diff20pred[:, 100:], cmap = diffcmap, vmin = -30, vmax = 30)
+    # plt.title(None)
+    # ax.xaxis.set_major_locator(ticker.NullLocator())
+    # ax.yaxis.set_major_locator(ticker.NullLocator())
+    # ax.spines['top'].set_visible(False)
+    # ax.spines['right'].set_visible(False)
+    # ax.spines['bottom'].set_visible(False)
+    # ax.spines['left'].set_visible(False)
+    # fig.text(0.2, 0.2, 'Model: ' + name, fontsize = 15)
+    # plt.show()
+    # fig.savefig(path + 'figures/' + name + '_pred_diff.png')
 
     # i += 1
 

@@ -54,6 +54,12 @@ class ConvLSTMCell(nn.Module):
                 torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device))
 
 
+class Flatten(torch.nn.Module):
+    def forward(self, input):
+        b, seq_len, dim, h, w = input.size()
+        return input.view(-1, b, seq_len, dim)
+    
+
 class ConvLSTM(nn.Module):
     
     """
@@ -119,6 +125,9 @@ class ConvLSTM(nn.Module):
                                       padding = 1,
                                       bias=self.bias)
         
+        self.flatten = Flatten()
+        self.linear2 = torch.nn.Linear(hidden_dim*2, 1)
+        
     def forward(self, input_tensor, hidden_state=None):
         """
         Parameters
@@ -170,11 +179,17 @@ class ConvLSTM(nn.Module):
             layer_output_list = layer_output_list[-1:]
             last_state_list = last_state_list[-1:]
         
-        ###########
-        x = torch.moveaxis(layer_output_list[-1], 2, 1) # (b, t, hidden_dim, w, h) -> (b, hidden_dim, t, w, h)
-        out = self.conv3d(x)
+        # ###########
+        # x = torch.moveaxis(layer_output_list[-1], 2, 1) # (b, t, hidden_dim, w, h) -> (b, hidden_dim, t, w, h)
+        # out = self.conv3d(x)
         
-        return out # layer_output_list # out
+        
+        ## linear layer
+        out_flatten = self.flatten(layer_output)
+        output = self.linear2(out_flatten)
+        return output
+        
+        # return out # layer_output_list # out
 
     def _init_hidden(self, batch_size, image_size):
         init_states = []

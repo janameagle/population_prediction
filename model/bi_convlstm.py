@@ -310,7 +310,8 @@ class ConvBLSTM(nn.Module):
     
         ## conv3d layer
         x = torch.moveaxis(layer_output, 2,1) # (b,t,dim,w,h) -> (b,dim,t,w,h)
-        return self.conv3d(x)
+        x = self.conv3d(x)
+        return x
         
         # return layer_output if self.return_all_layers is True else layer_output[:, -1:], last_state, last_state_inv
 
