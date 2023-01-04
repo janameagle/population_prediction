@@ -14,5 +14,5 @@ These are the processing steps and according folders:
           - model: architecture of the neural networks
           - utilis: additional settings for the networks
 - predict: use the trained networks to predict future time steps
-- results: analyse and validate the predictions results
+- results: analyze and validate the predictions results
 - hazard: analyze the earthquake and tsunami model for the exposure assessment
