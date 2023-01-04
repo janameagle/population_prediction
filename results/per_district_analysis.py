@@ -21,7 +21,7 @@ config = {
         "l1": 64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
         "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
-        "batch_size": 6, #random.choice([2, 4, 6, 8]),
+        "batch_size": 2, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
         "model_n" : '04-20_4y',
         "save" : True,
@@ -193,6 +193,8 @@ def change_zonal(pred_arr, years = ['02', '05', '08', '11', '14', '17'], include
     return out
     
 
+
+
 ###############################################################################
 # change of one district compared with lstm and rf
 ###############################################################################
@@ -234,6 +236,9 @@ def mean_change_one_dist(dist = 'Lima'):
     plt.show()
     
 mean_change_one_dist(dist = 'grouped')
+
+
+
 
 ###############################################################################
 # diff predicted change and actual change
@@ -310,6 +315,7 @@ def change_pred_gt(years = ['17', '20'], absolute = True):
     
     
 
+
 ###############################################################################
 # yearly change for one district
 ###############################################################################
@@ -372,6 +378,8 @@ def change_one_dist(years = ['02', '05', '08', '11', '14', '17'], include_pred =
     plt.title('Per pixel {}'.format(change_type))
     plt.xticks([0,1,2,3,4,5], ['0205', '0508', '0811', '1114', '1417', '1720'])
     plt.show()
+
+
 
 
 ###############################################################################

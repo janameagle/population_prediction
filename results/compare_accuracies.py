@@ -20,7 +20,7 @@ import seaborn as sns
 
 # change matplotlib fontsize globally
 plt.rcParams['font.size'] = 32
-#custom color palette:
+#custom color palettes:
 myset6 = ['#0051a2', '#97964a', '#ffd44f', '#f4777f', '#93003a']
 myset5 = ['#0051a2', '#97964a', '#ffd44f', '#f4777f', '#93003a'] # 
 myset4 = ['#0051a2', '#97964a', '#f4777f', '#93003a'] #'#ffd44f', 
@@ -31,40 +31,39 @@ proj_dir = "D:/Masterarbeit/population_prediction/"
 
 path = proj_dir + 'data/test/'
 
-params6 = 'lr0.0012_bs6_1l64_2lna/'
-params2 = 'lr0.0012_bs2_1l64_2lna/'
+params = 'lr0.0012_bs2_1l64_2lna/'
 paramsLSTM = 'lr0.0012_bs1_1l64_2lna/'
 
-models = [ 'ConvLSTM_02-20_3y_all/' + params6 + 'run1/', # bs6
-            'ConvLSTM_02-20_3y_all/' + params6 + 'run2/', # bs6
-              'ConvLSTM_02-20_3y_all/' + params2 + 'run3/', 
-              'ConvLSTM_02-20_3y_all/' + params2 + 'run4/',
-              'ConvLSTM_02-20_3y_all/' + params2 + 'run5/',
-            'ConvLSTM_02-20_3y_static/' + params6 + 'run1/', # bs6
-            'ConvLSTM_02-20_3y_static/' + params6 + 'run2/', # bs6
-            'ConvLSTM_02-20_3y_static/' + params6 + 'run3/', # bs6
-              'ConvLSTM_02-20_3y_static/' + params2 + 'run4/',
-              'ConvLSTM_02-20_3y_static/' + params2 + 'run5/',
-            'ConvLSTM_02-20_3y_pop/' + params6 + 'run1/', # bs6
-            'ConvLSTM_02-20_3y_pop/' + params6 + 'run2/', # bs6
-            'ConvLSTM_02-20_3y_pop/' + params2 + 'run3/',                      
-              'ConvLSTM_02-20_3y_pop/' + params2 + 'run4/',
-              'ConvLSTM_02-20_3y_pop/' + params2 + 'run5/',
-            'BiConvLSTM_02-20_3y_all/' + params6 + 'run1/', # bs6
-            'BiConvLSTM_02-20_3y_all/' + params6 + 'run2/', # bs6
-            'BiConvLSTM_02-20_3y_all/' + params6 + 'run3/', # bs6
-              'BiConvLSTM_02-20_3y_all/' + params2 + 'run4/',
-              'BiConvLSTM_02-20_3y_all/' + params2 + 'run5/',
-            'BiConvLSTM_02-20_3y_static/' + params6 + 'run1/', # bs6
-            'BiConvLSTM_02-20_3y_static/' + params2 + 'run2/',    
-            'BiConvLSTM_02-20_3y_static/' + params2 + 'run3/',   
-              'BiConvLSTM_02-20_3y_static/' + params2 + 'run4/',    
-              'BiConvLSTM_02-20_3y_static/' + params2 + 'run5/',
-            'BiConvLSTM_02-20_3y_pop/' + params6 + 'run1/', # bs6       
-            'BiConvLSTM_02-20_3y_pop/' + params2 + 'run2/',  
-            'BiConvLSTM_02-20_3y_pop/' + params2 + 'run3/',      
-              'BiConvLSTM_02-20_3y_pop/' + params2 + 'run4/',
-              'BiConvLSTM_02-20_3y_pop/' + params2 + 'run5/',
+models = [ 'ConvLSTM_02-20_3y_all/' + params + 'run1/', # bs6
+            'ConvLSTM_02-20_3y_all/' + params + 'run2/', # bs6
+              'ConvLSTM_02-20_3y_all/' + params + 'run3/', 
+              'ConvLSTM_02-20_3y_all/' + params + 'run4/',
+              'ConvLSTM_02-20_3y_all/' + params + 'run5/',
+            'ConvLSTM_02-20_3y_static/' + params + 'run1/', # bs6
+            'ConvLSTM_02-20_3y_static/' + params + 'run2/', # bs6
+            'ConvLSTM_02-20_3y_static/' + params + 'run3/', # bs6
+              'ConvLSTM_02-20_3y_static/' + params + 'run4/',
+              'ConvLSTM_02-20_3y_static/' + params + 'run5/',
+            'ConvLSTM_02-20_3y_pop/' + params + 'run1/', # bs6
+            'ConvLSTM_02-20_3y_pop/' + params + 'run2/', # bs6
+            'ConvLSTM_02-20_3y_pop/' + params + 'run3/',                      
+              'ConvLSTM_02-20_3y_pop/' + params + 'run4/',
+              'ConvLSTM_02-20_3y_pop/' + params + 'run5/',
+            'BiConvLSTM_02-20_3y_all/' + params + 'run1/', # bs6
+            'BiConvLSTM_02-20_3y_all/' + params + 'run2/', # bs6
+            'BiConvLSTM_02-20_3y_all/' + params + 'run3/', # bs6
+              'BiConvLSTM_02-20_3y_all/' + params + 'run4/',
+              'BiConvLSTM_02-20_3y_all/' + params + 'run5/',
+            'BiConvLSTM_02-20_3y_static/' + params + 'run1/', # bs6
+            'BiConvLSTM_02-20_3y_static/' + params + 'run2/',    
+            'BiConvLSTM_02-20_3y_static/' + params + 'run3/',   
+              'BiConvLSTM_02-20_3y_static/' + params + 'run4/',    
+              'BiConvLSTM_02-20_3y_static/' + params + 'run5/',
+            'BiConvLSTM_02-20_3y_pop/' + params + 'run1/', # bs6       
+            'BiConvLSTM_02-20_3y_pop/' + params + 'run2/',  
+            'BiConvLSTM_02-20_3y_pop/' + params + 'run3/',      
+              'BiConvLSTM_02-20_3y_pop/' + params + 'run4/',
+              'BiConvLSTM_02-20_3y_pop/' + params + 'run5/',
             'LSTM_02-20_3y_all/' + paramsLSTM + 'run1/',
             'LSTM_02-20_3y_all/' + paramsLSTM + 'run2/',
             'LSTM_02-20_3y_all/' + paramsLSTM + 'run3/',
@@ -150,6 +149,7 @@ errors = errors.drop(['pears_r'], axis = 1)
 errors = errors.drop(['r'], axis = 1)
 
 
+
 ####################################
 # scatterplot
 ####################################
@@ -211,6 +211,8 @@ plt.legend(title = None)
 plt.show()
 
 
+
+
 ######################################
 # color per feature set
 fig,ax = plt.subplots()
@@ -237,6 +239,8 @@ plt.title('Errors per interval')
 plt.legend(title='Features')
 # sns.boxplot(data=melt, x='value', y='feat')
 plt.show()
+
+
 
 ######################################
 # find best runs for each model, from rmse
@@ -283,6 +287,7 @@ for model in models:
     model_mean = pd.concat([model_mean, mean_])
 
 print(model_mean)
+
 
 
 

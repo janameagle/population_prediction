@@ -413,8 +413,9 @@ def train_ConvGRU(config):
 # define early stopping settings
 early_stopping = EarlyStopping(tolerance=10, min_delta=0.01) 
 
-
+###########################
 # train multiple models
+###########################
 all_models = ['ConvLSTM']   # ['LSTM', 'BiLSTM', 'ConvLSTM', 'BiConvLSTM']
 all_factors = ['pop']       # ['all', 'static', 'pop']
 all_modeln = ['02-20_3y']   # ['02-20_3y', '04-20_4y', '02-20_2y', '01-20_1y']

@@ -406,7 +406,7 @@ for m in all_models:
 
 
 ###############################################################################
-# all scatter plots together
+# all scatter plots together - best training runs
 ###############################################################################
 
 # global reg    
@@ -419,16 +419,15 @@ pop = gt[:,1,:,:] # all years
 pop20 = pop[-1,:,:]
 pop20[lima == 0] = np.nan
     
-params6 = 'lr0.0012_bs6_1l64_2lna/'
-params2 = 'lr0.0012_bs2_1l64_2lna/'
+params = 'lr0.0012_bs2_1l64_2lna/'
 paramsLSTM = 'lr0.0012_bs1_1l64_2lna/'
 
-models = ['ConvLSTM_02-20_3y_all/' + params2 + 'run3/', 
-            'ConvLSTM_02-20_3y_static/' + params2 + 'run5/',
-            'ConvLSTM_02-20_3y_pop/' + params2 + 'run4/',
-            'BiConvLSTM_02-20_3y_all/' + params6 + 'run2/', # bs6
-            'BiConvLSTM_02-20_3y_static/' + params2 + 'run2/',    
-            'BiConvLSTM_02-20_3y_pop/' + params2 + 'run2/',  
+models = ['ConvLSTM_02-20_3y_all/' + params + 'run3/', 
+            'ConvLSTM_02-20_3y_static/' + params + 'run5/',
+            'ConvLSTM_02-20_3y_pop/' + params + 'run4/',
+            'BiConvLSTM_02-20_3y_all/' + params + 'run2/', # bs6
+            'BiConvLSTM_02-20_3y_static/' + params + 'run2/',    
+            'BiConvLSTM_02-20_3y_pop/' + params + 'run2/',  
             'LSTM_02-20_3y_all/' + paramsLSTM + 'run3/',
             'LSTM_02-20_3y_static/' + paramsLSTM + 'run1/',
             'LSTM_02-20_3y_pop/' + paramsLSTM + 'run4/',

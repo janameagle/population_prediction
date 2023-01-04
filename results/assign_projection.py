@@ -23,7 +23,7 @@ config = {
         "l1": 64, #2 ** np.random.randint(2, 8), # [4, 8, 16, 32, 64, 128, 256]
         "l2": 'na', #2 ** np.random.randint(2, 8), # 'na', # 
         "lr": 0.0012, # round(np.random.uniform(0.01, 0.00001), 4), # (0.1, 0.00001)
-        "batch_size": 6, #random.choice([2, 4, 6, 8]),
+        "batch_size": 2, #random.choice([2, 4, 6, 8]),
         "epochs": 50,
         "model_n" : '02-20_3y',
         "save" : True,
@@ -99,28 +99,6 @@ dataset.SetProjection(projection)
 dataset.GetRasterBand(1).WriteArray(pred)
 dataset.FlushCache()  # Write to disk.
 
-
-# save diff20pred
-# driver = gdal.GetDriverByName('GTiff')
-# dataset = driver.Create(
-#         save_name_diff,
-#         x_pixels,
-#         y_pixels,
-#         1,
-#         gdal.GDT_Float32, )
-
-# dataset.SetGeoTransform(GeoT)
-# # dataset.SetGeoTransform((
-# #         x_min,    # 0
-# #         pixel_size,  # 1
-# #         0,                      # 2
-# #         y_max,    # 3
-# #         0,                      # 4
-# #         -pixel_size))  
-
-# dataset.SetProjection(projection)
-# dataset.GetRasterBand(1).WriteArray(diff20pred)
-# dataset.FlushCache()  # Write to disk.
 
 
 # # read it back in for checking
